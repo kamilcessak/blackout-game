@@ -6,7 +6,7 @@
     "target": "es2020",
     "lib": ["es2020"],
     "moduleResolution": "node",
-   "types": ["node"],
+    "types": ["node"],
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
@@ -20,6 +20,10 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
   "ts-node": {
     "files": true

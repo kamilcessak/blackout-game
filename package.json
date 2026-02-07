@@ -1,0 +1,21 @@
+{
+  "name": "blackout-game",
+  "private": true,
+  "scripts": {
+    "lint": "eslint backend shared frontend",
+    "lint:fix": "eslint backend shared frontend --fix",
+    "format": "prettier --write \"backend/**/*.{ts,tsx,json}\" \"frontend/**/*.{ts,tsx,json,js}\" \"shared/**/*.ts\"",
+    "format:check": "prettier --check \"backend/**/*.{ts,tsx,json}\" \"frontend/**/*.{ts,tsx,json,js}\" \"shared/**/*.ts\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "typescript": "^5.9.3",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.15.0"
+  }
+}
