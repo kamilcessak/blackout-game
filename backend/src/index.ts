@@ -1,8 +1,9 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
-import mapRoutes from "./features/map/map.routes";
+import mapRoutes from './features/map/map.routes';
+import inventoryRoutes from './features/inventory/inventory.routes';
 
 dotenv.config();
 
@@ -12,13 +13,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/map", mapRoutes);
+app.use('/api/map', mapRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
-app.get("/", (req, res) => {
-  console.log("Ktoś zapukał do API!");
-  res.json({ message: "Połączono z bazą dowodzenia Blackout!" });
+app.get('/', (req, res) => {
+  res.json({ message: 'Połączono z bazą dowodzenia Blackout!' });
 });
 
-app.listen(Number(PORT), "0.0.0.0", () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Serwer działa na http://localhost:${PORT}`);
 });
