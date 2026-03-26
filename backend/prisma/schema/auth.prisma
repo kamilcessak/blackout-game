@@ -6,6 +6,8 @@ model User {
   hp        Int      @default(100)
   hunger    Int      @default(100)
   thirst    Int      @default(100)
+  xp        Int      @default(0)
+  level     Int      @default(1)
   inventory InventoryItem[]
   cooldowns UserLocationCooldown[]
   createdAt DateTime @default(now())

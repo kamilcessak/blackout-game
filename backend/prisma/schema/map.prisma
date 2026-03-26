@@ -33,3 +33,10 @@ model UserLocationCooldown {
 
   @@unique([userId, locationId])
 }
+
+model GameConfig {
+  id              Int @id @default(1)
+  xpPerLoot       Int @default(10)
+  baseStorage     Int @default(10)
+  storagePerLevel Int @default(5)
+}

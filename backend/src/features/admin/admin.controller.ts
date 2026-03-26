@@ -35,7 +35,16 @@ export const createItem = async (req: Request, res: Response) => {
 export const getPlayers = async (req: Request, res: Response) => {
   try {
     const players = await prisma.user.findMany({
-      select: { id: true, username: true, email: true, hp: true, hunger: true, thirst: true },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        hp: true,
+        hunger: true,
+        thirst: true,
+        xp: true,
+        level: true,
+      },
     });
     return res.status(200).json(players);
   } catch (error) {
@@ -73,6 +82,76 @@ export const healPlayer = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Nie udało się uleczyć gracza.' });
+  }
+};
+
+export const setPlayerLevel = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { level, xp } = req.body as { level?: number; xp?: number };
+
+    if (level == null || !Number.isInteger(level) || level < 1) {
+      return res.status(400).json({ error: 'Pole level jest wymagane i musi być liczbą >= 1.' });
+    }
+
+    const player = await prisma.user.update({
+      where: { id },
+      data: {
+        level,
+        xp: xp != null && Number.isInteger(xp) && xp >= 0 ? xp : 0,
+      },
+      select: { id: true, username: true, level: true, xp: true },
+    });
+
+    return res.status(200).json(player);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się zmienić poziomu gracza.' });
+  }
+};
+
+export const getGameConfig = async (_req: Request, res: Response) => {
+  try {
+    const config = await prisma.gameConfig.findFirst({ where: { id: 1 } });
+
+    if (!config) {
+      return res.status(404).json({ error: 'Konfiguracja gry nie została znaleziona.' });
+    }
+
+    return res.status(200).json(config);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się pobrać konfiguracji gry.' });
+  }
+};
+
+export const updateGameConfig = async (req: Request, res: Response) => {
+  try {
+    const { xpPerLoot, baseStorage, storagePerLevel } = req.body as {
+      xpPerLoot?: number;
+      baseStorage?: number;
+      storagePerLevel?: number;
+    };
+
+    const config = await prisma.gameConfig.upsert({
+      where: { id: 1 },
+      update: {
+        ...(xpPerLoot != null && { xpPerLoot }),
+        ...(baseStorage != null && { baseStorage }),
+        ...(storagePerLevel != null && { storagePerLevel }),
+      },
+      create: {
+        id: 1,
+        xpPerLoot: xpPerLoot ?? 10,
+        baseStorage: baseStorage ?? 10,
+        storagePerLevel: storagePerLevel ?? 5,
+      },
+    });
+
+    return res.status(200).json(config);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się zaktualizować konfiguracji gry.' });
   }
 };
 

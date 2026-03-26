@@ -1,4 +1,4 @@
-import { Zap, Package, Users, MapPin } from 'lucide-react';
+import { Zap, Package, Users, MapPin, Settings } from 'lucide-react';
 import type { Tab } from '../types';
 import { styles } from '../styles/shared';
 
@@ -12,6 +12,7 @@ const TABS: { key: Tab; icon: typeof Package; label: string }[] = [
   { key: 'ITEMS', icon: Package, label: 'Przedmioty' },
   { key: 'PLAYERS', icon: Users, label: 'Gracze' },
   { key: 'AIRDROPS', icon: MapPin, label: 'Mapa / Zrzuty' },
+  { key: 'CONFIG', icon: Settings, label: 'Ustawienia gry' },
 ];
 
 export function Header({ activeTab, onTabChange, badgeText }: HeaderProps) {

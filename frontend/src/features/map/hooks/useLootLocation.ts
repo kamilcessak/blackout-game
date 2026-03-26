@@ -1,11 +1,15 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
 
-interface LootResponse {
+export interface LootResponse {
   success: boolean;
   message: string;
-  item: any;
-  totalQuantity: number;
+  item?: any;
+  totalQuantity?: number;
+  xpGained?: number;
+  xp?: number;
+  level?: number;
+  leveledUp?: boolean;
 }
 
 interface LootParams {
@@ -20,7 +24,12 @@ const lootLocation = async ({ locationId, lat, lng }: LootParams) => {
 };
 
 export const useLootLocation = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: lootLocation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playerStats'] });
+    },
   });
 };

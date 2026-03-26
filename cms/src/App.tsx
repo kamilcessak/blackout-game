@@ -9,11 +9,13 @@ import { useToast } from './hooks/useToast';
 import { useItems } from './features/items/hooks/useItems';
 import { usePlayers } from './features/players/hooks/usePlayers';
 import { useAirdrops } from './features/airdrops/hooks/useAirdrops';
+import { useGameConfig } from './features/config/hooks/useGameConfig';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { ItemsTab } from './features/items/components/ItemsTab';
 import { PlayersTab } from './features/players/components/PlayersTab';
 import { AirdropsTab } from './features/airdrops/components/AirdropsTab';
+import { ConfigTab } from './features/config/components/ConfigTab';
 import { styles } from './styles/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,8 +36,10 @@ function App() {
     fetchPlayers,
     killPlayer,
     healPlayer,
+    setPlayerLevel,
   } = usePlayers(showToast);
   const airdrop = useAirdrops(showToast);
+  const gameConfig = useGameConfig(showToast);
 
   useEffect(() => {
     if (activeTab === 'PLAYERS' && players.length === 0) fetchPlayers();
@@ -47,7 +51,9 @@ function App() {
       ? `${items.length} przedmiotów`
       : activeTab === 'PLAYERS'
         ? `${players.length} graczy`
-        : 'Zrzuty';
+        : activeTab === 'CONFIG'
+          ? 'Konfiguracja'
+          : 'Zrzuty';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -70,11 +76,21 @@ function App() {
             onRefresh={fetchPlayers}
             onKill={killPlayer}
             onHeal={healPlayer}
+            onSetLevel={setPlayerLevel}
           />
         )}
 
         {activeTab === 'AIRDROPS' && (
           <AirdropsTab items={items} airdrop={airdrop} showToast={showToast} />
+        )}
+
+        {activeTab === 'CONFIG' && (
+          <ConfigTab
+            config={gameConfig.config}
+            loading={gameConfig.loading}
+            saving={gameConfig.saving}
+            onSave={gameConfig.updateConfig}
+          />
         )}
       </main>
 

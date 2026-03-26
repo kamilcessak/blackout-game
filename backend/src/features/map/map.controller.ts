@@ -103,11 +103,15 @@ export const scanArea = async (req: Request, res: Response) => {
       overpassRes = await fetchOverpass(query);
     } catch (err) {
       console.error('Overpass API unavailable:', err);
-      res.status(502).json({ error: 'Serwery OpenStreetMap są chwilowo niedostępne. Spróbuj ponownie za chwilę.' });
+      res
+        .status(502)
+        .json({
+          error: 'Serwery OpenStreetMap są chwilowo niedostępne. Spróbuj ponownie za chwilę.',
+        });
       return;
     }
 
-    const json = await overpassRes.json() as unknown as { elements: OverpassElement[] };
+    const json = (await overpassRes.json()) as unknown as { elements: OverpassElement[] };
     const elements: OverpassElement[] = json.elements ?? [];
 
     const toInsert = elements
@@ -201,7 +205,26 @@ export const spawnDevLocation = async (req: Request, res: Response) => {
   }
 };
 
-const BACKPACK_LIMIT = 20;
+async function getGameConfig() {
+  const config = await prisma.gameConfig.findFirst({ where: { id: 1 } });
+  return config ?? { xpPerLoot: 10, baseStorage: 10, storagePerLevel: 5 };
+}
+
+function processXpGain(currentXp: number, currentLevel: number, xpGained: number) {
+  let xp = currentXp + xpGained;
+  let level = currentLevel;
+  let leveledUp = false;
+
+  let xpNeeded = level * 100;
+  while (xp >= xpNeeded) {
+    xp -= xpNeeded;
+    level += 1;
+    leveledUp = true;
+    xpNeeded = level * 100;
+  }
+
+  return { xp, level, leveledUp };
+}
 
 export const lootOnLocation = async (req: Request, res: Response) => {
   try {
@@ -225,6 +248,17 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return;
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, xp: true, level: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Gracz nie został znaleziony.' });
+    }
+
+    const config = await getGameConfig();
+
     const { lat, lng } = req.body as { lat?: number; lng?: number };
 
     if (lat === undefined || lng === undefined) {
@@ -245,14 +279,16 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       });
     }
 
+    const maxCapacity = config.baseStorage + (user.level * config.storagePerLevel);
+
     const backpackSum = await prisma.inventoryItem.aggregate({
       where: { userId },
       _sum: { quantity: true },
     });
 
-    if ((backpackSum._sum.quantity ?? 0) >= BACKPACK_LIMIT) {
+    if ((backpackSum._sum.quantity ?? 0) >= maxCapacity) {
       return res.status(400).json({
-        error: `Twój plecak jest pełny! (Limit: ${BACKPACK_LIMIT})`,
+        error: `Twój plecak jest pełny! (Limit: ${maxCapacity})`,
       });
     }
 
@@ -306,12 +342,22 @@ export const lootOnLocation = async (req: Request, res: Response) => {
           lootedNames.push(`${ai.item.name} x${ai.quantity}`);
         }
 
+        const airdropXp = processXpGain(user.xp, user.level, config.xpPerLoot);
+        await prisma.user.update({
+          where: { id: userId },
+          data: { xp: airdropXp.xp, level: airdropXp.level },
+        });
+
         await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
         await prisma.location.delete({ where: { id: locationId } });
 
         return res.status(200).json({
           success: true,
           message: `Zrzut przeszukany! Znaleziono: ${lootedNames.join(', ')}.`,
+          xpGained: config.xpPerLoot,
+          xp: airdropXp.xp,
+          level: airdropXp.level,
+          leveledUp: airdropXp.leveledUp,
         });
       }
 
@@ -333,6 +379,12 @@ export const lootOnLocation = async (req: Request, res: Response) => {
         create: { userId, itemId: randomItem.id, quantity: 1 },
       });
 
+      const fallbackXp = processXpGain(user.xp, user.level, config.xpPerLoot);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { xp: fallbackXp.xp, level: fallbackXp.level },
+      });
+
       await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
       await prisma.location.delete({ where: { id: locationId } });
 
@@ -340,6 +392,10 @@ export const lootOnLocation = async (req: Request, res: Response) => {
         success: true,
         message: `Zrzut przeszukany! Znaleziono: ${randomItem.name}.`,
         item: randomItem,
+        xpGained: config.xpPerLoot,
+        xp: fallbackXp.xp,
+        level: fallbackXp.level,
+        leveledUp: fallbackXp.leveledUp,
       });
     }
 
@@ -358,8 +414,8 @@ export const lootOnLocation = async (req: Request, res: Response) => {
     }
 
     const LOCATION_LOOT_WEIGHTS: Record<string, Record<string, number>> = {
-      WATER:   { WATER: 6, FOOD: 1, MEDKIT: 1, RESOURCE: 1 },
-      FOOD:    { FOOD: 6,  WATER: 1, MEDKIT: 1, RESOURCE: 1 },
+      WATER: { WATER: 6, FOOD: 1, MEDKIT: 1, RESOURCE: 1 },
+      FOOD: { FOOD: 6, WATER: 1, MEDKIT: 1, RESOURCE: 1 },
       MEDICAL: { MEDKIT: 6, WATER: 2, FOOD: 1, RESOURCE: 1 },
     };
 
@@ -393,11 +449,21 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       },
     });
 
+    const xpResult = processXpGain(user.xp, user.level, config.xpPerLoot);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { xp: xpResult.xp, level: xpResult.level },
+    });
+
     return res.status(200).json({
       success: true,
       message: `Znaleziono ${randomItem.name} w ilości ${inventoryEntry.quantity}.`,
       item: randomItem,
       totalQuantity: inventoryEntry.quantity,
+      xpGained: config.xpPerLoot,
+      xp: xpResult.xp,
+      level: xpResult.level,
+      leveledUp: xpResult.leveledUp,
     });
   } catch (error) {
     console.error(error);

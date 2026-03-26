@@ -1,22 +1,28 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Rozpoczynam sadzenie danych...');
 
-  // Czyszczenie starych danych
+  // Czyszczenie starych danych (kolejność uwzględnia FK)
+  await prisma.userLocationCooldown.deleteMany();
+  await prisma.airdropItem.deleteMany();
+  await prisma.gameConfig.deleteMany();
   await prisma.inventoryItem.deleteMany();
   await prisma.item.deleteMany();
   await prisma.location.deleteMany();
   await prisma.user.deleteMany();
 
   // Tworzenie testowego gracza z ID: 1
+  const hashedPassword = await bcrypt.hash('test1234', 10);
   const player = await prisma.user.create({
     data: {
       id: 1,
       email: 'kamil@kamil.pl',
       username: 'Survivor',
+      password: hashedPassword,
       hp: 100,
     },
   });
@@ -71,6 +77,19 @@ async function main() {
     await prisma.location.create({ data: loc });
   }
   console.log(`🗺️ Dodano ${locations.length} lokacji.`);
+
+  // Konfiguracja gry (singleton)
+  await prisma.gameConfig.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      xpPerLoot: 10,
+      baseStorage: 10,
+      storagePerLevel: 5,
+    },
+  });
+  console.log('⚙️ Konfiguracja gry ustawiona.');
 }
 
 main()

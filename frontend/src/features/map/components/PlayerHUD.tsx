@@ -29,6 +29,25 @@ const StatBar = ({ label, icon, value, color }: StatBarProps) => {
   );
 };
 
+const XpBar = ({ xp, level }: { xp: number; level: number }) => {
+  const xpNeeded = level * 100;
+  const pct = xpNeeded > 0 ? Math.min(100, (xp / xpNeeded) * 100) : 0;
+
+  return (
+    <View style={styles.xpSection}>
+      <View style={styles.xpHeader}>
+        <Text style={styles.levelBadge}>LVL {level}</Text>
+        <Text style={styles.xpLabel}>
+          {xp} / {xpNeeded} XP
+        </Text>
+      </View>
+      <View style={styles.xpTrack}>
+        <View style={[styles.xpFill, { width: `${pct}%` }]} />
+      </View>
+    </View>
+  );
+};
+
 export const PlayerHUD = () => {
   const { data, isLoading, isError } = usePlayerStats();
 
@@ -43,11 +62,14 @@ export const PlayerHUD = () => {
           <Text style={styles.errorText}>Błąd HUD</Text>
         </View>
       ) : (
-        <View style={styles.row}>
-          <StatBar label="HP" icon="💖" value={data.hp} color="#ff3b30" />
-          <StatBar label="Hunger" icon="🍗" value={data.hunger} color="#ff9500" />
-          <StatBar label="Thirst" icon="💧" value={data.thirst} color="#0a84ff" />
-        </View>
+        <>
+          <View style={styles.row}>
+            <StatBar label="HP" icon="💖" value={data.hp} color="#ff3b30" />
+            <StatBar label="Hunger" icon="🍗" value={data.hunger} color="#ff9500" />
+            <StatBar label="Thirst" icon="💧" value={data.thirst} color="#0a84ff" />
+          </View>
+          <XpBar xp={data.xp} level={data.level} />
+        </>
       )}
     </View>
   );
@@ -106,5 +128,39 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  xpSection: {
+    marginTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+    paddingTop: 8,
+  },
+  xpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  levelBadge: {
+    color: '#5e9eff',
+    fontWeight: '900',
+    fontSize: 13,
+    letterSpacing: 1,
+  },
+  xpLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  xpTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#5e9eff',
   },
 });

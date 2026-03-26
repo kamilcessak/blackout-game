@@ -28,7 +28,7 @@ export function usePlayers(showToast: (msg: string, type: 'success' | 'error') =
         showToast('Nie udało się zabić gracza', 'error');
       }
     },
-    [showToast, fetchPlayers],
+    [showToast, fetchPlayers]
   );
 
   const healPlayer = useCallback(
@@ -41,8 +41,21 @@ export function usePlayers(showToast: (msg: string, type: 'success' | 'error') =
         showToast('Nie udało się uleczyć gracza', 'error');
       }
     },
-    [showToast, fetchPlayers],
+    [showToast, fetchPlayers]
   );
 
-  return { players, loading, fetchPlayers, killPlayer, healPlayer };
+  const setPlayerLevel = useCallback(
+    async (id: number, level: number) => {
+      try {
+        await api.patch(`/players/${id}/level`, { level, xp: 0 });
+        showToast(`Ustawiono poziom ${level}`, 'success');
+        await fetchPlayers();
+      } catch {
+        showToast('Nie udało się zmienić poziomu', 'error');
+      }
+    },
+    [showToast, fetchPlayers]
+  );
+
+  return { players, loading, fetchPlayers, killPlayer, healPlayer, setPlayerLevel };
 }

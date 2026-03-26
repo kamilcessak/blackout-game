@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, View, ActivityIndicator, Text, Alert, TouchableOpacity } from 'react-native';
+import {
+  Animated,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+  Text,
+  Alert,
+  TouchableOpacity,
+} from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -41,17 +49,18 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
 
   const isAirdrop = loc.type === 'AIRDROP';
 
-  const emoji = loc.isOnCooldown === true
-    ? '🪦'
-    : isAirdrop
-    ? '🪂'
-    : loc.type === 'WATER'
-    ? '💧'
-    : loc.type === 'MEDICAL'
-    ? '➕'
-    : loc.type === 'SHOP' || loc.type === 'FOOD'
-    ? '🥫'
-    : '📦';
+  const emoji =
+    loc.isOnCooldown === true
+      ? '🪦'
+      : isAirdrop
+        ? '🪂'
+        : loc.type === 'WATER'
+          ? '💧'
+          : loc.type === 'MEDICAL'
+            ? '➕'
+            : loc.type === 'SHOP' || loc.type === 'FOOD'
+              ? '🥫'
+              : '📦';
 
   return (
     <Marker
@@ -61,16 +70,24 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
       anchor={{ x: 0.5, y: 0.5 }}
       tracksViewChanges={tracksViewChanges}
     >
-      <View style={[
-        locationMarkerStyles.marker,
-        isAirdrop && locationMarkerStyles.airdrop,
-        loc.isOnCooldown === true && locationMarkerStyles.cooldown,
-      ]}>
+      <View
+        style={[
+          locationMarkerStyles.marker,
+          isAirdrop && locationMarkerStyles.airdrop,
+          loc.isOnCooldown === true && locationMarkerStyles.cooldown,
+        ]}
+      >
         <Text style={[locationMarkerStyles.emoji, isAirdrop && locationMarkerStyles.airdropEmoji]}>
           {emoji}
         </Text>
       </View>
-      <Callout onPress={loc.isOnCooldown === true ? undefined : () => onLoot(loc.id, loc.name, loc.latitude, loc.longitude)}>
+      <Callout
+        onPress={
+          loc.isOnCooldown === true
+            ? undefined
+            : () => onLoot(loc.id, loc.name, loc.latitude, loc.longitude)
+        }
+      >
         <View style={locationMarkerStyles.callout}>
           <Text style={locationMarkerStyles.calloutTitle}>{loc.name}</Text>
           <Text style={locationMarkerStyles.calloutDesc}>{loc.description || loc.type}</Text>
@@ -177,7 +194,9 @@ export const MapScreen = () => {
 
   const animLat = useRef<Animated.Value | null>(null);
   const animLon = useRef<Animated.Value | null>(null);
-  const [markerCoords, setMarkerCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [markerCoords, setMarkerCoords] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
 
   useEffect(() => {
     if (!userLocation) return;
@@ -287,7 +306,19 @@ export const MapScreen = () => {
       {
         onSuccess: (data) => {
           console.log(data);
-          Alert.alert(`Przeszukano: ${locationName}`, data.message);
+          Alert.alert(`Przeszukano: ${locationName}`, data.message, [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (data.leveledUp) {
+                  Alert.alert(
+                    'AWANS!',
+                    `Osiągnięto poziom ${data.level}! Twój plecak pomieści teraz więcej przedmiotów!`
+                  );
+                }
+              },
+            },
+          ]);
           refetch();
         },
         onError: (error: any) => {
@@ -296,7 +327,7 @@ export const MapScreen = () => {
             'Nie udało się przeszukać tej lokacji. Sprawdź połączenie z serwerem.';
           Alert.alert('Błąd', msg);
         },
-      },
+      }
     );
   };
 

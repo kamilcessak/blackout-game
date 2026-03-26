@@ -12,7 +12,7 @@ export const getPlayerStats = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { hp: true, hunger: true, thirst: true },
+      select: { hp: true, hunger: true, thirst: true, xp: true, level: true },
     });
 
     if (!user) {
@@ -63,8 +63,16 @@ export const respawn = async (req: Request, res: Response) => {
 
       return tx.user.update({
         where: { id: userId },
-        data: { hp: 100, hunger: 100, thirst: 100 },
-        select: { id: true, username: true, hp: true, hunger: true, thirst: true },
+        data: { hp: 100, hunger: 100, thirst: 100, xp: 0, level: 1 },
+        select: {
+          id: true,
+          username: true,
+          hp: true,
+          hunger: true,
+          thirst: true,
+          xp: true,
+          level: true,
+        },
       });
     });
 
@@ -74,4 +82,3 @@ export const respawn = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Wystąpił błąd podczas odrodzenia gracza.' });
   }
 };
-

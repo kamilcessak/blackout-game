@@ -1,4 +1,4 @@
-export type Tab = 'ITEMS' | 'PLAYERS' | 'AIRDROPS';
+export type Tab = 'ITEMS' | 'PLAYERS' | 'AIRDROPS' | 'CONFIG';
 
 export interface Item {
   id: number;
@@ -13,11 +13,20 @@ export interface Player {
   hp: number;
   hunger: number;
   thirst: number;
+  xp: number;
+  level: number;
 }
 
 export interface AirdropItem {
   itemId: number;
   quantity: number;
+}
+
+export interface GameConfig {
+  id: number;
+  xpPerLoot: number;
+  baseStorage: number;
+  storagePerLevel: number;
 }
 
 export interface Toast {
