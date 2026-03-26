@@ -8,6 +8,7 @@ import { RootStackParamList } from '@/navigation/types';
 
 import { useLocations } from '../hooks/useLocations';
 import { useLootLocation } from '../hooks/useLootLocation';
+import { useScanArea } from '../hooks/useScanArea';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { PlayerHUD } from '../components/PlayerHUD';
 import { calculateDistance } from '@/utils/distance';
@@ -133,6 +134,7 @@ export const MapScreen = () => {
 
   const { data: locations, isLoading, isError, refetch } = useLocations();
   const { mutate: lootLocation, isPending } = useLootLocation();
+  const { mutate: scanArea, isPending: isScanPending } = useScanArea();
   const {
     location: userLocation,
     isLoading: isLocationLoading,
@@ -203,6 +205,24 @@ export const MapScreen = () => {
       console.error(error);
       Alert.alert('Błąd', 'Nie udało się stworzyć dev lokacji.');
     }
+  };
+
+  const handleScanArea = () => {
+    if (!userLocation) {
+      Alert.alert('Brak GPS', 'Nie można zeskanować okolicy bez lokalizacji GPS.');
+      return;
+    }
+    scanArea(
+      { lat: userLocation.coords.latitude, lon: userLocation.coords.longitude },
+      {
+        onSuccess: (data) => {
+          Alert.alert('Radar', `Znaleziono ${data.scanned} nowych punktów w okolicy.`);
+        },
+        onError: () => {
+          Alert.alert('Błąd', 'Nie udało się zeskanować okolicy. Sprawdź połączenie.');
+        },
+      }
+    );
   };
 
   const handleLootLocation = (
@@ -314,6 +334,17 @@ export const MapScreen = () => {
       <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
         <Text style={fabText}>🛠 Spawn Loot</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.fabRadar, isScanPending && styles.fabDisabled]}
+        onPress={handleScanArea}
+        disabled={isScanPending}
+      >
+        {isScanPending ? (
+          <ActivityIndicator size="small" color="#00ccff" />
+        ) : (
+          <Text style={styles.fabRadarText}>📡 Skanuj</Text>
+        )}
+      </TouchableOpacity>
 
       <View style={styles.dpad}>
         <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(MOVE_STEP, 0)}>
@@ -372,6 +403,27 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2,
     borderColor: '#ffaa00',
+  },
+  fabRadar: {
+    position: 'absolute',
+    bottom: 210,
+    right: 20,
+    backgroundColor: '#000',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#00ccff',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  fabDisabled: {
+    opacity: 0.6,
+  },
+  fabRadarText: {
+    color: '#00ccff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   fabText: {
     color: '#00ff00',

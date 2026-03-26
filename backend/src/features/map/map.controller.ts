@@ -3,6 +3,143 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchOverpass(query: string): Promise<globalThis.Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < OVERPASS_ENDPOINTS.length; attempt++) {
+    const url = OVERPASS_ENDPOINTS[attempt]!;
+    try {
+      const fetchRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+
+      if (fetchRes.ok) return fetchRes;
+
+      console.warn(`Overpass endpoint ${url} returned ${fetchRes.status}, trying next...`);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`Overpass endpoint ${url} failed: ${lastError.message}, trying next...`);
+    }
+
+    if (attempt < OVERPASS_ENDPOINTS.length - 1) {
+      await sleep(1000 * (attempt + 1));
+    }
+  }
+
+  throw lastError ?? new Error('All Overpass endpoints failed');
+}
+
+type OsmLocationType = 'FOOD' | 'MEDICAL' | 'WATER';
+
+interface OverpassElement {
+  id: number;
+  lat: number;
+  lon: number;
+  tags?: {
+    name?: string;
+    shop?: string;
+    amenity?: string;
+    natural?: string;
+  };
+}
+
+function resolveOsmType(tags: OverpassElement['tags']): OsmLocationType | null {
+  if (!tags) return null;
+  if (tags.shop === 'supermarket' || tags.shop === 'convenience') return 'FOOD';
+  if (tags.amenity === 'pharmacy') return 'MEDICAL';
+  if (tags.natural === 'water') return 'WATER';
+  return null;
+}
+
+function resolveOsmName(tags: OverpassElement['tags'], type: OsmLocationType): string {
+  if (tags?.name) return tags.name;
+  if (type === 'FOOD') return 'Opuszczony Sklep';
+  if (type === 'MEDICAL') return 'Opuszczona Apteka';
+  return 'Zbiornik Wody';
+}
+
+export const scanArea = async (req: Request, res: Response) => {
+  try {
+    const rawLat = req.body?.lat ?? req.query?.lat;
+    const rawLon = req.body?.lon ?? req.query?.lon;
+
+    const lat = Number(rawLat);
+    const lon = Number(rawLon);
+
+    if (!rawLat || !rawLon || isNaN(lat) || isNaN(lon)) {
+      res.status(400).json({ error: 'Wymagane pola: lat, lon (liczby).' });
+      return;
+    }
+
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      res.status(400).json({ error: 'Nieprawidłowe współrzędne geograficzne.' });
+      return;
+    }
+
+    const query = `
+      [out:json];
+      (
+        node["shop"="supermarket"](around:1000,${lat},${lon});
+        node["shop"="convenience"](around:1000,${lat},${lon});
+        node["amenity"="pharmacy"](around:1000,${lat},${lon});
+        node["natural"="water"](around:1000,${lat},${lon});
+      );
+      out;
+    `;
+
+    let overpassRes: globalThis.Response;
+    try {
+      overpassRes = await fetchOverpass(query);
+    } catch (err) {
+      console.error('Overpass API unavailable:', err);
+      res.status(502).json({ error: 'Serwery OpenStreetMap są chwilowo niedostępne. Spróbuj ponownie za chwilę.' });
+      return;
+    }
+
+    const json = await overpassRes.json() as unknown as { elements: OverpassElement[] };
+    const elements: OverpassElement[] = json.elements ?? [];
+
+    const toInsert = elements
+      .map((el) => {
+        const type = resolveOsmType(el.tags);
+        if (!type) return null;
+        return {
+          name: resolveOsmName(el.tags, type),
+          type,
+          latitude: el.lat,
+          longitude: el.lon,
+          osmId: el.id.toString(),
+        };
+      })
+      .filter((el): el is NonNullable<typeof el> => el !== null);
+
+    await prisma.location.createMany({
+      data: toInsert,
+      skipDuplicates: true,
+    });
+
+    const allLocations = await prisma.location.findMany();
+
+    res.status(200).json({
+      scanned: toInsert.length,
+      locations: allLocations,
+    });
+  } catch (error) {
+    console.error('Błąd skanowania okolicy:', error);
+    res.status(500).json({ error: 'Nie udało się zeskanować okolicy.' });
+  }
+};
+
 export const getMapLocations = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -133,7 +270,19 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       });
     }
 
-    const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+    const LOCATION_LOOT_WEIGHTS: Record<string, Record<string, number>> = {
+      WATER:   { WATER: 6, FOOD: 1, MEDKIT: 1, RESOURCE: 1 },
+      FOOD:    { FOOD: 6,  WATER: 1, MEDKIT: 1, RESOURCE: 1 },
+      MEDICAL: { MEDKIT: 6, WATER: 2, FOOD: 1, RESOURCE: 1 },
+    };
+
+    const weights = LOCATION_LOOT_WEIGHTS[location.type] ?? {};
+    const weightedPool = allItems.flatMap((item) => {
+      const w = weights[item.type] ?? 1;
+      return Array(w).fill(item);
+    });
+
+    const randomItem = weightedPool[Math.floor(Math.random() * weightedPool.length)];
     if (!randomItem) {
       return res.status(500).json({
         error: 'Nie udało się wybrać przedmiotu.',

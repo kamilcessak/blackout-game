@@ -5,6 +5,7 @@ model Location {
   latitude    Float
   longitude   Float
   description String?
+  osmId       String?  @unique
 
   createdAt   DateTime @default(now())
   cooldowns   UserLocationCooldown[]
