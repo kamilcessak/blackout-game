@@ -12,19 +12,122 @@ import { useUserLocation } from '../hooks/useUserLocation';
 import { PlayerHUD } from '../components/PlayerHUD';
 import { calculateDistance } from '@/utils/distance';
 import { api } from '@/utils/api';
+import { darkMapStyle } from '../styles/darkMapStyle';
+
+type LocationMarkerProps = {
+  loc: {
+    id: number;
+    latitude: number;
+    longitude: number;
+    name: string;
+    description?: string | null;
+    type: string;
+    isOnCooldown?: boolean;
+  };
+  isPending: boolean;
+  onLoot: (id: number, name: string, lat: number, lon: number) => void;
+};
+
+const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerProps) => {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTracksViewChanges(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const emoji = loc.isOnCooldown === true
+    ? '🪦'
+    : loc.type === 'WATER'
+    ? '💧'
+    : loc.type === 'MEDICAL'
+    ? '➕'
+    : loc.type === 'SHOP' || loc.type === 'FOOD'
+    ? '🥫'
+    : '📦';
+
+  return (
+    <Marker
+      coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
+      title={loc.name}
+      description={loc.description || loc.type}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={tracksViewChanges}
+    >
+      <View style={[locationMarkerStyles.marker, loc.isOnCooldown === true && locationMarkerStyles.cooldown]}>
+        <Text style={locationMarkerStyles.emoji}>{emoji}</Text>
+      </View>
+      <Callout onPress={loc.isOnCooldown === true ? undefined : () => onLoot(loc.id, loc.name, loc.latitude, loc.longitude)}>
+        <View style={locationMarkerStyles.callout}>
+          <Text style={locationMarkerStyles.calloutTitle}>{loc.name}</Text>
+          <Text style={locationMarkerStyles.calloutDesc}>{loc.description || loc.type}</Text>
+          {isPending ? (
+            <ActivityIndicator size="small" color="#000" style={{ marginTop: 5 }} />
+          ) : loc.isOnCooldown === true ? (
+            <Text style={locationMarkerStyles.calloutCooldown}>Przeszukano. Wróć później.</Text>
+          ) : (
+            <Text style={locationMarkerStyles.calloutAction}>👉 Zbierz przedmioty</Text>
+          )}
+        </View>
+      </Callout>
+    </Marker>
+  );
+});
+
+const locationMarkerStyles = StyleSheet.create({
+  marker: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(10, 10, 10, 0.85)',
+    borderWidth: 2,
+    borderColor: '#cc3300',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#cc3300',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  cooldown: {
+    borderColor: '#444',
+    shadowColor: '#444',
+    shadowOpacity: 0.3,
+  },
+  emoji: {
+    fontSize: 24,
+  },
+  callout: {
+    width: 200,
+    padding: 10,
+    alignItems: 'center',
+  },
+  calloutTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  calloutDesc: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  calloutAction: {
+    fontWeight: 'bold',
+    color: '#007BFF',
+    marginTop: 5,
+  },
+  calloutCooldown: {
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 5,
+  },
+});
 
 export const MapScreen = () => {
-  const {
-    container,
-    map,
-    center,
-    callout,
-    calloutTitle,
-    calloutDesc,
-    calloutAction,
-    fab,
-    fabText,
-  } = styles;
+  const { container, map, center, fab, fabText } = styles;
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -169,6 +272,8 @@ export const MapScreen = () => {
       <MapView
         ref={mapRef}
         style={map}
+        provider="google"
+        customMapStyle={darkMapStyle}
         initialRegion={{
           latitude: userLocation?.coords.latitude ?? 50.885,
           longitude: userLocation?.coords.longitude ?? 21.67,
@@ -182,41 +287,22 @@ export const MapScreen = () => {
             key="player"
             coordinate={markerCoords}
             title="Twoja pozycja"
-            pinColor="#00ff00"
             zIndex={999}
             tracksViewChanges={false}
-          />
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.playerMarker}>
+              <Text style={styles.playerMarkerEmoji}>🏃</Text>
+            </View>
+          </Marker>
         )}
         {locations?.map((loc) => (
-          <Marker
-            key={loc.id}
-            coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
-            title={loc.name}
-            description={loc.description || loc.type}
-            pinColor={
-              loc.isOnCooldown ? '#555' : loc.type === 'WATER' ? 'blue' : 'red'
-            }
-          >
-            <Callout
-              onPress={
-                loc.isOnCooldown
-                  ? undefined
-                  : () => handleLootLocation(loc.id, loc.name, loc.latitude, loc.longitude)
-              }
-            >
-              <View style={callout}>
-                <Text style={calloutTitle}>{loc.name}</Text>
-                <Text style={calloutDesc}>{loc.description || loc.type}</Text>
-                {isPending ? (
-                  <ActivityIndicator size="small" color="#000" style={{ marginTop: 5 }} />
-                ) : loc.isOnCooldown ? (
-                  <Text style={styles.calloutCooldown}>Przeszukano. Wróć później.</Text>
-                ) : (
-                  <Text style={calloutAction}>👉 Zbierz przedmioty</Text>
-                )}
-              </View>
-            </Callout>
-          </Marker>
+          <LocationMarker
+            key={`${loc.id}-${loc.isOnCooldown ?? false}`}
+            loc={loc}
+            isPending={isPending}
+            onLoot={handleLootLocation}
+          />
         ))}
       </MapView>
       <TouchableOpacity style={fab} onPress={() => navigation.navigate('Inventory')}>
@@ -254,32 +340,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { width: '100%', height: '100%' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#222' },
-  callout: {
-    width: 200,
-    padding: 10,
-    alignItems: 'center',
-  },
-  calloutTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  calloutDesc: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  calloutAction: {
-    fontWeight: 'bold',
-    color: '#007BFF',
-    marginTop: 5,
-  },
-  calloutCooldown: {
-    fontWeight: 'bold',
-    color: '#999',
-    marginTop: 5,
-  },
   fab: {
     position: 'absolute',
     bottom: 30,
@@ -350,5 +410,23 @@ const styles = StyleSheet.create({
     color: '#00ff00',
     fontSize: 22,
     fontWeight: 'bold',
+  },
+  playerMarker: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderWidth: 2.5,
+    borderColor: '#00ff00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#00ff00',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  playerMarkerEmoji: {
+    fontSize: 28,
   },
 });
