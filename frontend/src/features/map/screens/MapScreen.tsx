@@ -8,7 +8,10 @@ import { RootStackParamList } from '@/navigation/types';
 
 import { useLocations } from '../hooks/useLocations';
 import { useLootLocation } from '../hooks/useLootLocation';
+import { useUserLocation } from '../hooks/useUserLocation';
 import { PlayerHUD } from '../components/PlayerHUD';
+import { calculateDistance } from '@/utils/distance';
+import { api } from '@/utils/api';
 
 export const MapScreen = () => {
   const {
@@ -25,14 +28,58 @@ export const MapScreen = () => {
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  const { data: locations, isLoading, isError } = useLocations();
+  const { data: locations, isLoading, isError, refetch } = useLocations();
   const { mutate: lootLocation, isPending } = useLootLocation();
+  const {
+    location: userLocation,
+    isLoading: isLocationLoading,
+  } = useUserLocation();
 
-  const handleLootLocation = (locationId: number, locationName: string) => {
+  const handleSpawnDevLocation = async () => {
+    if (!userLocation) {
+      Alert.alert('Brak GPS', 'Nie można spawnu bez lokalizacji GPS.');
+      return;
+    }
+    try {
+      await api.post('/map/locations/spawn', {
+        lat: userLocation.coords.latitude,
+        lng: userLocation.coords.longitude,
+      });
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Błąd', 'Nie udało się stworzyć dev lokacji.');
+    }
+  };
+
+  const handleLootLocation = (
+    locationId: number,
+    locationName: string,
+    locLat: number,
+    locLon: number
+  ) => {
+    if (!userLocation) {
+      Alert.alert('Brak GPS', 'Nie udało się ustalić Twojej lokalizacji. Spróbuj ponownie.');
+      return;
+    }
+
+    const distance = calculateDistance(
+      userLocation.coords.latitude,
+      userLocation.coords.longitude,
+      locLat,
+      locLon
+    );
+
+    if (distance > 50) {
+      Alert.alert('Za daleko!', `Musisz podejść bliżej. Jesteś ${distance} metrów od celu.`);
+      return;
+    }
+
     lootLocation(locationId, {
       onSuccess: (data) => {
         console.log(data);
         Alert.alert(`Przeszukano: ${locationName}`, data.message);
+        refetch();
       },
       onError: (error) => {
         console.error(error);
@@ -40,6 +87,15 @@ export const MapScreen = () => {
       },
     });
   };
+
+  if (isLocationLoading) {
+    return (
+      <View style={center}>
+        <ActivityIndicator size="large" color="#00ff00" />
+        <Text style={{ color: '#00ff00', marginTop: 10 }}>Szukanie sygnału GPS...</Text>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -63,8 +119,8 @@ export const MapScreen = () => {
       <MapView
         style={map}
         initialRegion={{
-          latitude: 50.885,
-          longitude: 21.67,
+          latitude: userLocation?.coords.latitude ?? 50.885,
+          longitude: userLocation?.coords.longitude ?? 21.67,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         }}
@@ -76,14 +132,24 @@ export const MapScreen = () => {
             coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
             title={loc.name}
             description={loc.description || loc.type}
-            pinColor={loc.type === 'WATER' ? 'blue' : 'red'}
+            pinColor={
+              loc.isOnCooldown ? '#555' : loc.type === 'WATER' ? 'blue' : 'red'
+            }
           >
-            <Callout onPress={() => handleLootLocation(loc.id, loc.name)}>
+            <Callout
+              onPress={
+                loc.isOnCooldown
+                  ? undefined
+                  : () => handleLootLocation(loc.id, loc.name, loc.latitude, loc.longitude)
+              }
+            >
               <View style={callout}>
                 <Text style={calloutTitle}>{loc.name}</Text>
                 <Text style={calloutDesc}>{loc.description || loc.type}</Text>
                 {isPending ? (
                   <ActivityIndicator size="small" color="#000" style={{ marginTop: 5 }} />
+                ) : loc.isOnCooldown ? (
+                  <Text style={styles.calloutCooldown}>Przeszukano. Wróć później.</Text>
                 ) : (
                   <Text style={calloutAction}>👉 Zbierz przedmioty</Text>
                 )}
@@ -97,6 +163,9 @@ export const MapScreen = () => {
       </TouchableOpacity>
       <TouchableOpacity style={styles.fabSettings} onPress={() => navigation.navigate('Settings')}>
         <Text style={fabText}>⚙️ Ustawienia</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
+        <Text style={fabText}>🛠 Spawn Loot</Text>
       </TouchableOpacity>
     </View>
   );
@@ -127,6 +196,11 @@ const styles = StyleSheet.create({
     color: '#007BFF',
     marginTop: 5,
   },
+  calloutCooldown: {
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 5,
+  },
   fab: {
     position: 'absolute',
     bottom: 30,
@@ -148,6 +222,17 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2,
     borderColor: '#00ff00',
+  },
+  fabDev: {
+    position: 'absolute',
+    bottom: 150,
+    right: 20,
+    backgroundColor: '#000',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#ffaa00',
   },
   fabText: {
     color: '#00ff00',

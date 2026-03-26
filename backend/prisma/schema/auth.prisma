@@ -7,5 +7,6 @@ model User {
   hunger    Int      @default(100)
   thirst    Int      @default(100)
   inventory InventoryItem[]
+  cooldowns UserLocationCooldown[]
   createdAt DateTime @default(now())
 }

@@ -5,6 +5,18 @@ model Location {
   latitude    Float
   longitude   Float
   description String?
-  
+
   createdAt   DateTime @default(now())
+  cooldowns   UserLocationCooldown[]
+}
+
+model UserLocationCooldown {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  locationId Int
+  user       User     @relation(fields: [userId], references: [id])
+  location   Location @relation(fields: [locationId], references: [id])
+  lootedAt   DateTime @default(now())
+
+  @@unique([userId, locationId])
 }

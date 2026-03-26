@@ -6,4 +6,5 @@ export interface Location {
   longitude: number;
   type: string;
   createdAt?: Date;
+  isOnCooldown?: boolean;
 }

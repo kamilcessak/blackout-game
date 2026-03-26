@@ -5,12 +5,61 @@ const prisma = new PrismaClient();
 
 export const getMapLocations = async (req: Request, res: Response) => {
   try {
-    const locations = await prisma.location.findMany();
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Nieautoryzowany.' });
+      return;
+    }
 
-    res.json(locations);
+    const COOLDOWN_MINUTES = 15;
+
+    const locations = await prisma.location.findMany({
+      include: {
+        cooldowns: {
+          where: { userId },
+        },
+      },
+    });
+
+    const now = new Date();
+    const result = locations.map(({ cooldowns, ...location }) => {
+      const lastLooted = cooldowns[0]?.lootedAt;
+      const isOnCooldown =
+        lastLooted !== undefined &&
+        now.getTime() - lastLooted.getTime() < COOLDOWN_MINUTES * 60 * 1000;
+
+      return { ...location, isOnCooldown };
+    });
+
+    res.json(result);
   } catch (error) {
     console.error('Błąd pobierania mapy:', error);
     res.status(500).json({ error: 'Nie udało się pobrać danych mapy.' });
+  }
+};
+
+export const spawnDevLocation = async (req: Request, res: Response) => {
+  try {
+    const { lat, lng } = req.body as { lat?: number; lng?: number };
+
+    if (lat === undefined || lng === undefined) {
+      res.status(400).json({ error: 'Wymagane pola: lat, lng.' });
+      return;
+    }
+
+    const location = await prisma.location.create({
+      data: {
+        name: 'Skrzynka Testowa',
+        type: 'LOOT',
+        latitude: lat,
+        longitude: lng,
+      },
+    });
+
+    res.status(201).json(location);
+  } catch (error) {
+    console.error('Błąd tworzenia dev lokacji:', error);
+    res.status(500).json({ error: 'Nie udało się stworzyć lokacji.' });
   }
 };
 
@@ -42,11 +91,38 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Lokalizacja nie znaleziona' });
     }
 
+    const COOLDOWN_MINUTES = 15;
+    const now = new Date();
+
+    const existingCooldown = await prisma.userLocationCooldown.findUnique({
+      where: { userId_locationId: { userId, locationId } },
+    });
+
+    if (existingCooldown) {
+      const elapsedMs = now.getTime() - existingCooldown.lootedAt.getTime();
+      const elapsedMinutes = elapsedMs / (1000 * 60);
+
+      if (elapsedMinutes < COOLDOWN_MINUTES) {
+        const minutesLeft = Math.ceil(COOLDOWN_MINUTES - elapsedMinutes);
+        return res.status(403).json({
+          error: `To miejsce jest jeszcze puste. Wróć za ${minutesLeft} ${minutesLeft === 1 ? 'minutę' : 'minut'}.`,
+          cooldownMinutesLeft: minutesLeft,
+        });
+      }
+    }
+
     const emptyLootChance = Math.random();
+
+    await prisma.userLocationCooldown.upsert({
+      where: { userId_locationId: { userId, locationId } },
+      update: { lootedAt: now },
+      create: { userId, locationId, lootedAt: now },
+    });
+
     if (emptyLootChance < 0.3) {
       return res.status(200).json({
         success: true,
-        message: 'Przeszukałeś to miejsce i nic nie znaleziono. Ktoś tu był przed tobą.',
+        message: 'Przeszukałeś to miejsce i nic nie znaleziono. Ktoś tu był przed tobą.',
       });
     }
 
@@ -60,7 +136,7 @@ export const lootOnLocation = async (req: Request, res: Response) => {
     const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
     if (!randomItem) {
       return res.status(500).json({
-        error: 'Nie udało się wybrać przedmiotu.',
+        error: 'Nie udało się wybrać przedmiotu.',
       });
     }
 
