@@ -3,6 +3,8 @@ model User {
   email     String   @unique
   username  String?
   hp        Int      @default(100)
+  hunger    Int      @default(100)
+  thirst    Int      @default(100)
   inventory InventoryItem[]
   createdAt DateTime @default(now())
 }

@@ -8,6 +8,7 @@ import { RootStackParamList } from '@/navigation/types';
 
 import { useLocations } from '../hooks/useLocations';
 import { useLootLocation } from '../hooks/useLootLocation';
+import { PlayerHUD } from '../components/PlayerHUD';
 
 export const MapScreen = () => {
   const {
@@ -58,6 +59,7 @@ export const MapScreen = () => {
 
   return (
     <View style={container}>
+      <PlayerHUD />
       <MapView
         style={map}
         initialRegion={{

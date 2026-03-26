@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 
 import { useInventory } from '../hooks/useInventory';
+import { useConsumeItem } from '../hooks/useConsumeItem';
 
 export const InventoryScreen = () => {
   const {
@@ -24,11 +26,33 @@ export const InventoryScreen = () => {
     itemName,
     itemQuantity,
     itemType,
+    actionsRow,
+    useButton,
+    useButtonText,
+    useButtonSpinner,
     empty,
   } = styles;
 
   const { data: inventory, isLoading, isError } = useInventory();
+  const { mutate: consumeItem, isPending: isConsuming } = useConsumeItem();
   const navigation = useNavigation();
+
+  const getConsumePressHandler = useCallback(
+    (itemId: number) => () => {
+      consumeItem(itemId, {
+        onSuccess: (data) => {
+          Alert.alert(
+            'Użyto przedmiotu',
+            `HP: ${data.stats.hp}\nGłód: ${data.stats.hunger}\nPragnienie: ${data.stats.thirst}`,
+          );
+        },
+        onError: () => {
+          Alert.alert('Błąd', 'Nie udało się użyć przedmiotu.');
+        },
+      });
+    },
+    [consumeItem],
+  );
 
   if (isLoading) {
     return <ActivityIndicator size="large" color="#00ff00" style={center} />;
@@ -57,6 +81,22 @@ export const InventoryScreen = () => {
               <Text style={itemQuantity}>x{item.quantity}</Text>
             </View>
             <Text style={itemType}>Typ: {item.item.type}</Text>
+
+            {['FOOD', 'WATER', 'MEDKIT'].includes(item.item.type) && (
+              <View style={actionsRow}>
+                <TouchableOpacity
+                  style={[useButton, isConsuming && { opacity: 0.7 }]}
+                  disabled={isConsuming}
+                  onPress={getConsumePressHandler(item.item.id)}
+                >
+                  {isConsuming ? (
+                    <ActivityIndicator color="#ffffff" style={useButtonSpinner} />
+                  ) : (
+                    <Text style={useButtonText}>Użyj</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
         ListEmptyComponent={<Text style={empty}>Twój plecak jest pusty. Idź coś znaleźć!</Text>}
@@ -84,5 +124,22 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   itemQuantity: { fontSize: 18, fontWeight: 'bold', color: '#00ff00' },
   itemType: { fontSize: 14, color: '#aaa' },
+  actionsRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  useButton: {
+    backgroundColor: '#1faa59',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2bd673',
+    minWidth: 90,
+    alignItems: 'center',
+  },
+  useButtonText: { color: '#fff', fontWeight: '700' },
+  useButtonSpinner: { height: 18 },
   empty: { color: '#666', textAlign: 'center', marginTop: 50, fontSize: 16 },
 });
