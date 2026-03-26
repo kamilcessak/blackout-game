@@ -8,8 +8,14 @@ interface LootResponse {
   totalQuantity: number;
 }
 
-const lootLocation = async (locationId: number) => {
-  const { data } = await api.post<LootResponse>(`/map/locations/${locationId}/loot`);
+interface LootParams {
+  locationId: number;
+  lat: number;
+  lng: number;
+}
+
+const lootLocation = async ({ locationId, lat, lng }: LootParams) => {
+  const { data } = await api.post<LootResponse>(`/map/locations/${locationId}/loot`, { lat, lng });
   return data;
 };
 

@@ -278,17 +278,26 @@ export const MapScreen = () => {
       return;
     }
 
-    lootLocation(locationId, {
-      onSuccess: (data) => {
-        console.log(data);
-        Alert.alert(`Przeszukano: ${locationName}`, data.message);
-        refetch();
+    lootLocation(
+      {
+        locationId,
+        lat: userLocation.coords.latitude,
+        lng: userLocation.coords.longitude,
       },
-      onError: (error) => {
-        console.error(error);
-        Alert.alert('Błąd', 'Nie udało się przeszukać tej lokacji. Sprawdź połączenie z serwerem.');
+      {
+        onSuccess: (data) => {
+          console.log(data);
+          Alert.alert(`Przeszukano: ${locationName}`, data.message);
+          refetch();
+        },
+        onError: (error: any) => {
+          const msg =
+            error?.response?.data?.error ??
+            'Nie udało się przeszukać tej lokacji. Sprawdź połączenie z serwerem.';
+          Alert.alert('Błąd', msg);
+        },
       },
-    });
+    );
   };
 
   if (isLocationLoading) {

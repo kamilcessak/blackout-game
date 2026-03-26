@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { calculateDistance } from '../../utils/distance';
 
 const prisma = new PrismaClient();
 
@@ -200,6 +201,8 @@ export const spawnDevLocation = async (req: Request, res: Response) => {
   }
 };
 
+const BACKPACK_LIMIT = 20;
+
 export const lootOnLocation = async (req: Request, res: Response) => {
   try {
     const idParam = req.params.id;
@@ -222,10 +225,35 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return;
     }
 
+    const { lat, lng } = req.body as { lat?: number; lng?: number };
+
+    if (lat === undefined || lng === undefined) {
+      res.status(400).json({ error: 'Wymagane pola: lat, lng.' });
+      return;
+    }
+
     const location = await prisma.location.findUnique({ where: { id: locationId } });
 
     if (!location) {
       return res.status(404).json({ error: 'Lokalizacja nie znaleziona' });
+    }
+
+    const dist = calculateDistance(lat, lng, location.latitude, location.longitude);
+    if (dist > 50) {
+      return res.status(403).json({
+        error: 'Jesteś za daleko od tego punktu (Weryfikacja serwera)!',
+      });
+    }
+
+    const backpackSum = await prisma.inventoryItem.aggregate({
+      where: { userId },
+      _sum: { quantity: true },
+    });
+
+    if ((backpackSum._sum.quantity ?? 0) >= BACKPACK_LIMIT) {
+      return res.status(400).json({
+        error: `Twój plecak jest pełny! (Limit: ${BACKPACK_LIMIT})`,
+      });
     }
 
     const COOLDOWN_MINUTES = 15;

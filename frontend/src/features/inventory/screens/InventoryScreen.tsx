@@ -35,10 +35,14 @@ const recipes = [
   },
 ];
 
+const BACKPACK_LIMIT = 20;
+
 export const InventoryScreen = () => {
   const [activeTab, setActiveTab] = useState<Tab>('BACKPACK');
 
   const { data: inventory, isLoading, isError } = useInventory();
+  const totalItems = (inventory ?? []).reduce((sum, entry) => sum + entry.quantity, 0);
+  const isBackpackFull = totalItems >= BACKPACK_LIMIT;
   const { mutate: consumeItem, isPending: isConsuming } = useConsumeItem();
   const { mutate: craftItem, isPending: isCrafting } = useCraftItem();
   const navigation = useNavigation();
@@ -89,6 +93,12 @@ export const InventoryScreen = () => {
           <Text style={styles.backText}>⬅ Wróć do mapy</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Ekwipunek</Text>
+      </View>
+
+      <View style={styles.capacityBar}>
+        <Text style={[styles.capacityText, isBackpackFull && styles.capacityFull]}>
+          Pojemność plecaka: {totalItems} / {BACKPACK_LIMIT}
+        </Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -189,6 +199,22 @@ const styles = StyleSheet.create({
   backButton: { marginBottom: 10 },
   backText: { color: '#00ff00', fontSize: 16 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  capacityBar: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderColor: '#333',
+    alignItems: 'center',
+  },
+  capacityText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#00ff00',
+  },
+  capacityFull: {
+    color: '#ff3b30',
+  },
   tabRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
