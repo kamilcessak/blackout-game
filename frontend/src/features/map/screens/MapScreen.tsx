@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, ActivityIndicator, Text, Alert, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, View, ActivityIndicator, Text, Alert, TouchableOpacity } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -33,7 +33,57 @@ export const MapScreen = () => {
   const {
     location: userLocation,
     isLoading: isLocationLoading,
+    moveVirtual,
   } = useUserLocation();
+
+  const MOVE_STEP = 0.0002;
+
+  const mapRef = useRef<MapView>(null);
+
+  const animLat = useRef<Animated.Value | null>(null);
+  const animLon = useRef<Animated.Value | null>(null);
+  const [markerCoords, setMarkerCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    if (!userLocation) return;
+    const { latitude, longitude } = userLocation.coords;
+
+    if (!animLat.current || !animLon.current) {
+      animLat.current = new Animated.Value(latitude);
+      animLon.current = new Animated.Value(longitude);
+      setMarkerCoords({ latitude, longitude });
+
+      animLat.current.addListener(({ value }) =>
+        setMarkerCoords((prev) => (prev ? { ...prev, latitude: value } : null))
+      );
+      animLon.current.addListener(({ value }) =>
+        setMarkerCoords((prev) => (prev ? { ...prev, longitude: value } : null))
+      );
+    } else {
+      Animated.parallel([
+        Animated.timing(animLat.current, {
+          toValue: latitude,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(animLon.current, {
+          toValue: longitude,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude,
+        longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      300
+    );
+  }, [userLocation]);
 
   const handleSpawnDevLocation = async () => {
     if (!userLocation) {
@@ -117,15 +167,26 @@ export const MapScreen = () => {
     <View style={container}>
       <PlayerHUD />
       <MapView
+        ref={mapRef}
         style={map}
         initialRegion={{
           latitude: userLocation?.coords.latitude ?? 50.885,
           longitude: userLocation?.coords.longitude ?? 21.67,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
         }}
-        showsUserLocation={true}
+        showsUserLocation={false}
       >
+        {markerCoords && (
+          <Marker
+            key="player"
+            coordinate={markerCoords}
+            title="Twoja pozycja"
+            pinColor="#00ff00"
+            zIndex={999}
+            tracksViewChanges={false}
+          />
+        )}
         {locations?.map((loc) => (
           <Marker
             key={loc.id}
@@ -167,6 +228,24 @@ export const MapScreen = () => {
       <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
         <Text style={fabText}>🛠 Spawn Loot</Text>
       </TouchableOpacity>
+
+      <View style={styles.dpad}>
+        <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(MOVE_STEP, 0)}>
+          <Text style={styles.dpadText}>▲</Text>
+        </TouchableOpacity>
+        <View style={styles.dpadRow}>
+          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, -MOVE_STEP)}>
+            <Text style={styles.dpadText}>◀</Text>
+          </TouchableOpacity>
+          <View style={styles.dpadCenter} />
+          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, MOVE_STEP)}>
+            <Text style={styles.dpadText}>▶</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(-MOVE_STEP, 0)}>
+          <Text style={styles.dpadText}>▼</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -238,5 +317,38 @@ const styles = StyleSheet.create({
     color: '#00ff00',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  dpad: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    alignItems: 'center',
+    zIndex: 999,
+    elevation: 999,
+  },
+  dpadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dpadBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderWidth: 2,
+    borderColor: '#00ff00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 3,
+  },
+  dpadCenter: {
+    width: 52,
+    height: 52,
+    margin: 3,
+  },
+  dpadText: {
+    color: '#00ff00',
+    fontSize: 22,
+    fontWeight: 'bold',
   },
 });
