@@ -30,8 +30,11 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return;
     }
 
-    // HARDCODED FOR NOW - TODO: Make auth and get userId from request
-    const userId = 1;
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Nieautoryzowany.' });
+      return;
+    }
 
     const location = await prisma.location.findUnique({ where: { id: locationId } });
 

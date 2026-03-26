@@ -95,6 +95,9 @@ export const MapScreen = () => {
       <TouchableOpacity style={fab} onPress={() => navigation.navigate('Inventory')}>
         <Text style={fabText}>🎒 Plecak</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.fabSettings} onPress={() => navigation.navigate('Settings')}>
+        <Text style={fabText}>⚙️ Ustawienia</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -127,6 +130,17 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     bottom: 30,
+    right: 20,
+    backgroundColor: '#000',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#00ff00',
+  },
+  fabSettings: {
+    position: 'absolute',
+    bottom: 90,
     right: 20,
     backgroundColor: '#000',
     paddingVertical: 15,

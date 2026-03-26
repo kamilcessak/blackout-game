@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import mapRoutes from './features/map/map.routes';
 import inventoryRoutes from './features/inventory/inventory.routes';
 import playerRoutes from './features/player/player.routes';
+import authRoutes from './features/auth/auth.routes';
 import { startSurvivalTick } from './features/player/player.cron';
 
 dotenv.config();
@@ -15,6 +16,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/player', playerRoutes);

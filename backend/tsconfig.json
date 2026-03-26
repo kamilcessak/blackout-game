@@ -6,6 +6,7 @@
     "target": "es2020",
     "lib": ["es2020"],
     "moduleResolution": "node",
+    "typeRoots": ["./src/types", "./node_modules/@types"],
     "types": ["node"],
     "sourceMap": true,
     "declaration": true,
@@ -22,6 +23,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["./src/*"],
       "@shared/*": ["../shared/*"]
     }
   },

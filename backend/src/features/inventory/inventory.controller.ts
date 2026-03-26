@@ -5,8 +5,10 @@ const prisma = new PrismaClient();
 
 export const getPlayerInventory = async (req: Request, res: Response) => {
   try {
-    // HARDCODED FOR NOW - TODO: Make auth and get userId from request
-    const userId = 1;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Nieautoryzowany.' });
+    }
 
     const inventory = await prisma.inventoryItem.findMany({
       where: { userId },
@@ -36,8 +38,10 @@ export const consumeItem = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nieprawidłowe itemId.' });
     }
 
-    // HARDCODED FOR NOW - TODO: Make auth and get userId from request
-    const userId = 1;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Nieautoryzowany.' });
+    }
 
     const inventoryEntry = await prisma.inventoryItem.findUnique({
       where: {
