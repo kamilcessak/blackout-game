@@ -9,6 +9,18 @@ model Location {
 
   createdAt   DateTime @default(now())
   cooldowns   UserLocationCooldown[]
+  airdropItems AirdropItem[]
+}
+
+model AirdropItem {
+  id         Int      @id @default(autoincrement())
+  locationId Int
+  itemId     Int
+  quantity   Int      @default(1)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  item       Item     @relation(fields: [itemId], references: [id])
+
+  @@unique([locationId, itemId])
 }
 
 model UserLocationCooldown {

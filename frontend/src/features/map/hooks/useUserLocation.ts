@@ -10,6 +10,7 @@ interface UseUserLocationResult {
   errorMsg: string | null;
   isLoading: boolean;
   moveVirtual: (latOffset: number, lonOffset: number) => void;
+  resetToPhysical: () => void;
 }
 
 function buildLocationObject(
@@ -116,5 +117,11 @@ export function useUserLocation(): UseUserLocationResult {
     });
   }
 
-  return { location: virtualLocation, errorMsg, isLoading, moveVirtual };
+  function resetToPhysical() {
+    if (location) {
+      setVirtualLocation(location);
+    }
+  }
+
+  return { location: virtualLocation, errorMsg, isLoading, moveVirtual, resetToPhysical };
 }

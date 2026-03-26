@@ -3,6 +3,7 @@ model Item {
   name        String
   type        String // eg. FOOD, WATER, MEDKIT
   inventory   InventoryItem[]
+  airdropItems AirdropItem[]
 }
 
 model InventoryItem {

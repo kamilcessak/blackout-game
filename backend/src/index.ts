@@ -6,6 +6,7 @@ import mapRoutes from './features/map/map.routes';
 import inventoryRoutes from './features/inventory/inventory.routes';
 import playerRoutes from './features/player/player.routes';
 import authRoutes from './features/auth/auth.routes';
+import adminRoutes from './features/admin/admin.routes';
 import { startSurvivalTick } from './features/player/player.cron';
 
 dotenv.config();
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/player', playerRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Połączono z bazą dowodzenia Blackout!' });

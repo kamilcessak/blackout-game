@@ -51,3 +51,27 @@ export const updateUsername = async (req: Request, res: Response) => {
   }
 };
 
+export const respawn = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Nieautoryzowany.' });
+    }
+
+    const player = await prisma.$transaction(async (tx) => {
+      await tx.inventoryItem.deleteMany({ where: { userId } });
+
+      return tx.user.update({
+        where: { id: userId },
+        data: { hp: 100, hunger: 100, thirst: 100 },
+        select: { id: true, username: true, hp: true, hunger: true, thirst: true },
+      });
+    });
+
+    return res.status(200).json(player);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Wystąpił błąd podczas odrodzenia gracza.' });
+  }
+};
+

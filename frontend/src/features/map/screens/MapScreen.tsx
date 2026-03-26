@@ -14,6 +14,8 @@ import { PlayerHUD } from '../components/PlayerHUD';
 import { calculateDistance } from '@/utils/distance';
 import { api } from '@/utils/api';
 import { darkMapStyle } from '../styles/darkMapStyle';
+import { usePlayerStats } from '@/features/player/hooks/usePlayerStats';
+import { useRespawn } from '@/features/player/hooks/useRespawn';
 
 type LocationMarkerProps = {
   loc: {
@@ -37,8 +39,12 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
     return () => clearTimeout(timer);
   }, []);
 
+  const isAirdrop = loc.type === 'AIRDROP';
+
   const emoji = loc.isOnCooldown === true
     ? '🪦'
+    : isAirdrop
+    ? '🪂'
     : loc.type === 'WATER'
     ? '💧'
     : loc.type === 'MEDICAL'
@@ -55,8 +61,14 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
       anchor={{ x: 0.5, y: 0.5 }}
       tracksViewChanges={tracksViewChanges}
     >
-      <View style={[locationMarkerStyles.marker, loc.isOnCooldown === true && locationMarkerStyles.cooldown]}>
-        <Text style={locationMarkerStyles.emoji}>{emoji}</Text>
+      <View style={[
+        locationMarkerStyles.marker,
+        isAirdrop && locationMarkerStyles.airdrop,
+        loc.isOnCooldown === true && locationMarkerStyles.cooldown,
+      ]}>
+        <Text style={[locationMarkerStyles.emoji, isAirdrop && locationMarkerStyles.airdropEmoji]}>
+          {emoji}
+        </Text>
       </View>
       <Callout onPress={loc.isOnCooldown === true ? undefined : () => onLoot(loc.id, loc.name, loc.latitude, loc.longitude)}>
         <View style={locationMarkerStyles.callout}>
@@ -91,6 +103,17 @@ const locationMarkerStyles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
+  airdrop: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    elevation: 10,
+  },
   cooldown: {
     borderColor: '#444',
     shadowColor: '#444',
@@ -98,6 +121,9 @@ const locationMarkerStyles = StyleSheet.create({
   },
   emoji: {
     fontSize: 24,
+  },
+  airdropEmoji: {
+    fontSize: 30,
   },
   callout: {
     width: 200,
@@ -139,7 +165,11 @@ export const MapScreen = () => {
     location: userLocation,
     isLoading: isLocationLoading,
     moveVirtual,
+    resetToPhysical,
   } = useUserLocation();
+
+  const { data: playerStats } = usePlayerStats();
+  const { mutate: respawn, isPending: isRespawning } = useRespawn();
 
   const MOVE_STEP = 0.0002;
 
@@ -363,6 +393,29 @@ export const MapScreen = () => {
           <Text style={styles.dpadText}>▼</Text>
         </TouchableOpacity>
       </View>
+
+      {playerStats && playerStats.hp <= 0 && (
+        <View style={styles.deathOverlay}>
+          <Text style={styles.deathSkull}>💀</Text>
+          <Text style={styles.deathTitle}>NIE ŻYJESZ</Text>
+          <Text style={styles.deathSubtitle}>Straciłeś cały ekwipunek</Text>
+          <TouchableOpacity
+            style={[styles.respawnBtn, isRespawning && styles.fabDisabled]}
+            disabled={isRespawning}
+            onPress={() => {
+              respawn(undefined, {
+                onSuccess: () => resetToPhysical(),
+              });
+            }}
+          >
+            {isRespawning ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Text style={styles.respawnBtnText}>Zacznij od nowa</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -480,5 +533,46 @@ const styles = StyleSheet.create({
   },
   playerMarkerEmoji: {
     fontSize: 28,
+  },
+  deathOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  deathSkull: {
+    fontSize: 72,
+    marginBottom: 16,
+  },
+  deathTitle: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#ff3b30',
+    letterSpacing: 4,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deathSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 48,
+    textAlign: 'center',
+  },
+  respawnBtn: {
+    backgroundColor: '#ff3b30',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 30,
+    minWidth: 220,
+    alignItems: 'center',
+  },
+  respawnBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });

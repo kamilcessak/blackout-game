@@ -250,11 +250,70 @@ export const lootOnLocation = async (req: Request, res: Response) => {
 
     const emptyLootChance = Math.random();
 
-    await prisma.userLocationCooldown.upsert({
-      where: { userId_locationId: { userId, locationId } },
-      update: { lootedAt: now },
-      create: { userId, locationId, lootedAt: now },
-    });
+    const isAirdrop = location.type === 'AIRDROP';
+
+    if (!isAirdrop) {
+      await prisma.userLocationCooldown.upsert({
+        where: { userId_locationId: { userId, locationId } },
+        update: { lootedAt: now },
+        create: { userId, locationId, lootedAt: now },
+      });
+    }
+
+    if (isAirdrop) {
+      const airdropItems = await prisma.airdropItem.findMany({
+        where: { locationId },
+        include: { item: true },
+      });
+
+      if (airdropItems.length > 0) {
+        const lootedNames: string[] = [];
+
+        for (const ai of airdropItems) {
+          await prisma.inventoryItem.upsert({
+            where: { userId_itemId: { userId, itemId: ai.itemId } },
+            update: { quantity: { increment: ai.quantity } },
+            create: { userId, itemId: ai.itemId, quantity: ai.quantity },
+          });
+          lootedNames.push(`${ai.item.name} x${ai.quantity}`);
+        }
+
+        await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
+        await prisma.location.delete({ where: { id: locationId } });
+
+        return res.status(200).json({
+          success: true,
+          message: `Zrzut przeszukany! Znaleziono: ${lootedNames.join(', ')}.`,
+        });
+      }
+
+      // Fallback: airdrop without predefined items — give one random item
+      const allItems = await prisma.item.findMany();
+      if (allItems.length === 0) {
+        await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
+        await prisma.location.delete({ where: { id: locationId } });
+        return res.status(200).json({
+          success: true,
+          message: 'Zrzut przeszukany, ale był pusty.',
+        });
+      }
+
+      const randomItem = allItems[Math.floor(Math.random() * allItems.length)]!;
+      await prisma.inventoryItem.upsert({
+        where: { userId_itemId: { userId, itemId: randomItem.id } },
+        update: { quantity: { increment: 1 } },
+        create: { userId, itemId: randomItem.id, quantity: 1 },
+      });
+
+      await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
+      await prisma.location.delete({ where: { id: locationId } });
+
+      return res.status(200).json({
+        success: true,
+        message: `Zrzut przeszukany! Znaleziono: ${randomItem.name}.`,
+        item: randomItem,
+      });
+    }
 
     if (emptyLootChance < 0.3) {
       return res.status(200).json({
