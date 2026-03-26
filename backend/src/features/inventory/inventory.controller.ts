@@ -19,9 +19,7 @@ export const getPlayerInventory = async (req: Request, res: Response) => {
     });
 
     if (!inventory || inventory.length === 0) {
-      return res.status(404).json({
-        error: 'Brak przedmiotów w ekwipunku.',
-      });
+      return res.status(200).json([]);
     }
 
     return res.status(200).json(inventory);
