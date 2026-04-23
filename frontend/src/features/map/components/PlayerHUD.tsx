@@ -1,16 +1,17 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { usePlayerStats } from '@/features/player/hooks/usePlayerStats';
 
 type StatBarProps = {
   label: string;
-  icon: string;
+  iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   value: number;
   color: string;
 };
 
-const StatBar = ({ label, icon, value, color }: StatBarProps) => {
+const StatBar = ({ label, iconName, value, color }: StatBarProps) => {
   const v = () => {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(100, value));
@@ -18,9 +19,12 @@ const StatBar = ({ label, icon, value, color }: StatBarProps) => {
 
   return (
     <View style={styles.stat}>
-      <Text style={styles.statLabel} numberOfLines={1}>
-        {icon} {label}
-      </Text>
+      <View style={styles.statLabelRow}>
+        <MaterialCommunityIcons name={iconName} size={14} color={color} style={styles.statIcon} />
+        <Text style={styles.statLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
       <View style={styles.barTrack}>
         <View style={[styles.barFill, { width: `${v()}%`, backgroundColor: color }]} />
       </View>
@@ -64,9 +68,9 @@ export const PlayerHUD = () => {
       ) : (
         <>
           <View style={styles.row}>
-            <StatBar label="HP" icon="💖" value={data.hp} color="#ff3b30" />
-            <StatBar label="Hunger" icon="🍗" value={data.hunger} color="#ff9500" />
-            <StatBar label="Thirst" icon="💧" value={data.thirst} color="#0a84ff" />
+            <StatBar label="HP" iconName="heart-pulse" value={data.hp} color="#ff3b30" />
+            <StatBar label="Hunger" iconName="food-drumstick" value={data.hunger} color="#ff9500" />
+            <StatBar label="Thirst" iconName="water" value={data.thirst} color="#0a84ff" />
           </View>
           <XpBar xp={data.xp} level={data.level} />
         </>
@@ -102,11 +106,20 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 90,
   },
+  statLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 4,
+  },
+  statIcon: {
+    marginTop: 1,
+  },
   statLabel: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 12,
-    marginBottom: 6,
+    flexShrink: 1,
   },
   barTrack: {
     height: 10,

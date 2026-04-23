@@ -11,8 +11,9 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Location from 'expo-location';
 
-import { removeToken } from '@/utils/storage';
+import { removeToken, saveVirtualLocation } from '@/utils/storage';
 import { useUpdateUsername } from '../hooks/useUpdateUsername';
 import { RootStackParamList } from '@/navigation/types';
 
@@ -23,6 +24,7 @@ export const SettingsScreen = () => {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const { mutate: updateUsername, isPending } = useUpdateUsername();
+  const [isLocationSyncing, setIsLocationSyncing] = useState(false);
 
   const handleSaveUsername = () => {
     if (!username.trim()) {
@@ -46,6 +48,27 @@ export const SettingsScreen = () => {
     await removeToken();
     queryClient.clear();
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+  };
+
+  const handleUseDeviceLocation = async () => {
+    setIsLocationSyncing(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Brak uprawnień', 'Aby ustawić pozycję z GPS, zezwól na dostęp do lokalizacji.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const { latitude, longitude } = pos.coords;
+      await saveVirtualLocation({ latitude, longitude });
+      Alert.alert('Gotowe', 'Pozycja na mapie została ustawiona na aktualną lokalizację urządzenia.');
+    } catch {
+      Alert.alert('Błąd', 'Nie udało się pobrać lokalizacji GPS. Spróbuj ponownie.');
+    } finally {
+      setIsLocationSyncing(false);
+    }
   };
 
   return (
@@ -76,6 +99,24 @@ export const SettingsScreen = () => {
             <ActivityIndicator color="#000" />
           ) : (
             <Text style={styles.buttonText}>Zapisz</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Lokalizacja na mapie</Text>
+        <Text style={styles.sectionHint}>
+          Ustaw marker gracza na bieżące współrzędne GPS (nadpisuje zapisaną pozycję wirtualną).
+        </Text>
+        <TouchableOpacity
+          style={[styles.button, isLocationSyncing && styles.buttonDisabled]}
+          onPress={handleUseDeviceLocation}
+          disabled={isLocationSyncing}
+        >
+          {isLocationSyncing ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.buttonText}>Użyj lokalizacji urządzenia</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -125,6 +166,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 2,
     textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  sectionHint: {
+    color: '#666',
+    fontSize: 13,
+    lineHeight: 18,
     marginBottom: 14,
   },
   input: {

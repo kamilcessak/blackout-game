@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { useInventory } from '../hooks/useInventory';
@@ -90,7 +91,10 @@ export const InventoryScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>⬅ Wróć do mapy</Text>
+          <View style={styles.backRow}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#00ff00" />
+            <Text style={styles.backText}>Wróć do mapy</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.title}>Ekwipunek</Text>
       </View>
@@ -106,17 +110,31 @@ export const InventoryScreen = () => {
           style={[styles.tab, activeTab === 'BACKPACK' && styles.tabActive]}
           onPress={() => setActiveTab('BACKPACK')}
         >
-          <Text style={[styles.tabText, activeTab === 'BACKPACK' && styles.tabTextActive]}>
-            🎒 Plecak
-          </Text>
+          <View style={styles.tabInner}>
+            <MaterialCommunityIcons
+              name="bag-personal-outline"
+              size={18}
+              color={activeTab === 'BACKPACK' ? '#fff' : '#888'}
+            />
+            <Text style={[styles.tabText, activeTab === 'BACKPACK' && styles.tabTextActive]}>
+              Plecak
+            </Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'WORKSHOP' && styles.tabActive]}
           onPress={() => setActiveTab('WORKSHOP')}
         >
-          <Text style={[styles.tabText, activeTab === 'WORKSHOP' && styles.tabTextActive]}>
-            🛠 Warsztat
-          </Text>
+          <View style={styles.tabInner}>
+            <MaterialCommunityIcons
+              name="hammer-wrench"
+              size={18}
+              color={activeTab === 'WORKSHOP' ? '#fff' : '#888'}
+            />
+            <Text style={[styles.tabText, activeTab === 'WORKSHOP' && styles.tabTextActive]}>
+              Warsztat
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -197,6 +215,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { padding: 20, borderBottomWidth: 1, borderColor: '#333' },
   backButton: { marginBottom: 10 },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   backText: { color: '#00ff00', fontSize: 16 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
   capacityBar: {
@@ -224,7 +247,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#1e1e1e',
+  },
+  tabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   tabActive: {
     backgroundColor: '#1faa59',

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
 import {
   getSavedVirtualLocation,
@@ -11,6 +11,7 @@ interface UseUserLocationResult {
   isLoading: boolean;
   moveVirtual: (latOffset: number, lonOffset: number) => void;
   resetToPhysical: () => void;
+  syncVirtualFromStorage: () => Promise<void>;
 }
 
 function buildLocationObject(
@@ -123,5 +124,19 @@ export function useUserLocation(): UseUserLocationResult {
     }
   }
 
-  return { location: virtualLocation, errorMsg, isLoading, moveVirtual, resetToPhysical };
+  const syncVirtualFromStorage = useCallback(async () => {
+    const saved = await getSavedVirtualLocation();
+    if (saved) {
+      setVirtualLocation(buildLocationObject(saved.latitude, saved.longitude));
+    }
+  }, []);
+
+  return {
+    location: virtualLocation,
+    errorMsg,
+    isLoading,
+    moveVirtual,
+    resetToPhysical,
+    syncVirtualFromStorage,
+  };
 }

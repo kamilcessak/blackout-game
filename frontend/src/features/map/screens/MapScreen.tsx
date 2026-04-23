@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -8,8 +8,9 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { RootStackParamList } from '@/navigation/types';
@@ -49,18 +50,21 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
 
   const isAirdrop = loc.type === 'AIRDROP';
 
-  const emoji =
+  const markerIconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] =
     loc.isOnCooldown === true
-      ? '🪦'
+      ? 'grave-stone'
       : isAirdrop
-        ? '🪂'
+        ? 'parachute'
         : loc.type === 'WATER'
-          ? '💧'
+          ? 'water'
           : loc.type === 'MEDICAL'
-            ? '➕'
+            ? 'medical-bag'
             : loc.type === 'SHOP' || loc.type === 'FOOD'
-              ? '🥫'
-              : '📦';
+              ? 'food-takeout-box'
+              : 'package-variant';
+
+  const markerIconSize = isAirdrop ? 30 : 24;
+  const markerIconColor = isAirdrop ? '#fbbf24' : '#ffffff';
 
   return (
     <Marker
@@ -77,9 +81,11 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
           loc.isOnCooldown === true && locationMarkerStyles.cooldown,
         ]}
       >
-        <Text style={[locationMarkerStyles.emoji, isAirdrop && locationMarkerStyles.airdropEmoji]}>
-          {emoji}
-        </Text>
+        <MaterialCommunityIcons
+          name={markerIconName}
+          size={markerIconSize}
+          color={markerIconColor}
+        />
       </View>
       <Callout
         onPress={
@@ -96,7 +102,7 @@ const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerPro
           ) : loc.isOnCooldown === true ? (
             <Text style={locationMarkerStyles.calloutCooldown}>Przeszukano. Wróć później.</Text>
           ) : (
-            <Text style={locationMarkerStyles.calloutAction}>👉 Zbierz przedmioty</Text>
+            <Text style={locationMarkerStyles.calloutAction}>Zbierz przedmioty</Text>
           )}
         </View>
       </Callout>
@@ -135,12 +141,6 @@ const locationMarkerStyles = StyleSheet.create({
     borderColor: '#444',
     shadowColor: '#444',
     shadowOpacity: 0.3,
-  },
-  emoji: {
-    fontSize: 24,
-  },
-  airdropEmoji: {
-    fontSize: 30,
   },
   callout: {
     width: 200,
@@ -183,7 +183,14 @@ export const MapScreen = () => {
     isLoading: isLocationLoading,
     moveVirtual,
     resetToPhysical,
+    syncVirtualFromStorage,
   } = useUserLocation();
+
+  useFocusEffect(
+    useCallback(() => {
+      void syncVirtualFromStorage();
+    }, [syncVirtualFromStorage])
+  );
 
   const { data: playerStats } = usePlayerStats();
   const { mutate: respawn, isPending: isRespawning } = useRespawn();
@@ -382,7 +389,7 @@ export const MapScreen = () => {
             anchor={{ x: 0.5, y: 0.5 }}
           >
             <View style={styles.playerMarker}>
-              <Text style={styles.playerMarkerEmoji}>🏃</Text>
+              <MaterialCommunityIcons name="run-fast" size={28} color="#4ade80" />
             </View>
           </Marker>
         )}
@@ -396,13 +403,16 @@ export const MapScreen = () => {
         ))}
       </MapView>
       <TouchableOpacity style={fab} onPress={() => navigation.navigate('Inventory')}>
-        <Text style={fabText}>🎒 Plecak</Text>
+        <MaterialCommunityIcons name="bag-personal-outline" size={20} color="#00ff00" />
+        <Text style={fabText}>Plecak</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.fabSettings} onPress={() => navigation.navigate('Settings')}>
-        <Text style={fabText}>⚙️ Ustawienia</Text>
+        <MaterialCommunityIcons name="cog" size={20} color="#00ff00" />
+        <Text style={fabText}>Ustawienia</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
-        <Text style={fabText}>🛠 Spawn Loot</Text>
+        <MaterialCommunityIcons name="hammer-wrench" size={20} color="#00ff00" />
+        <Text style={fabText}>Spawn Loot</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.fabRadar, isScanPending && styles.fabDisabled]}
@@ -412,7 +422,10 @@ export const MapScreen = () => {
         {isScanPending ? (
           <ActivityIndicator size="small" color="#00ccff" />
         ) : (
-          <Text style={styles.fabRadarText}>📡 Skanuj</Text>
+          <View style={styles.fabRadarInner}>
+            <MaterialCommunityIcons name="radar" size={20} color="#00ccff" />
+            <Text style={styles.fabRadarText}>Skanuj</Text>
+          </View>
         )}
       </TouchableOpacity>
 
@@ -436,7 +449,7 @@ export const MapScreen = () => {
 
       {playerStats && playerStats.hp <= 0 && (
         <View style={styles.deathOverlay}>
-          <Text style={styles.deathSkull}>💀</Text>
+          <MaterialCommunityIcons name="skull-outline" size={72} color="#ff3b30" style={styles.deathSkull} />
           <Text style={styles.deathTitle}>NIE ŻYJESZ</Text>
           <Text style={styles.deathSubtitle}>Straciłeś cały ekwipunek</Text>
           <TouchableOpacity
@@ -468,6 +481,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 30,
     right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#000',
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -479,6 +495,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 90,
     right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#000',
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -490,6 +509,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 150,
     right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#000',
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -501,6 +523,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 210,
     right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#000',
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -508,7 +533,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#00ccff',
     minWidth: 120,
+  },
+  fabRadarInner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   fabDisabled: {
     opacity: 0.6,
@@ -571,9 +600,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
-  playerMarkerEmoji: {
-    fontSize: 28,
-  },
   deathOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
@@ -584,7 +610,6 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   deathSkull: {
-    fontSize: 72,
     marginBottom: 16,
   },
   deathTitle: {
