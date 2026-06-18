@@ -410,10 +410,12 @@ export const MapScreen = () => {
         <MaterialCommunityIcons name="cog" size={20} color="#00ff00" />
         <Text style={fabText}>Ustawienia</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
-        <MaterialCommunityIcons name="hammer-wrench" size={20} color="#00ff00" />
-        <Text style={fabText}>Spawn Loot</Text>
-      </TouchableOpacity>
+      {__DEV__ && (
+        <TouchableOpacity style={styles.fabDev} onPress={handleSpawnDevLocation}>
+          <MaterialCommunityIcons name="hammer-wrench" size={20} color="#00ff00" />
+          <Text style={fabText}>Spawn Loot</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[styles.fabRadar, isScanPending && styles.fabDisabled]}
         onPress={handleScanArea}
@@ -429,23 +431,25 @@ export const MapScreen = () => {
         )}
       </TouchableOpacity>
 
-      <View style={styles.dpad}>
-        <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(MOVE_STEP, 0)}>
-          <Text style={styles.dpadText}>▲</Text>
-        </TouchableOpacity>
-        <View style={styles.dpadRow}>
-          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, -MOVE_STEP)}>
-            <Text style={styles.dpadText}>◀</Text>
+      {__DEV__ && (
+        <View style={styles.dpad}>
+          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(MOVE_STEP, 0)}>
+            <Text style={styles.dpadText}>▲</Text>
           </TouchableOpacity>
-          <View style={styles.dpadCenter} />
-          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, MOVE_STEP)}>
-            <Text style={styles.dpadText}>▶</Text>
+          <View style={styles.dpadRow}>
+            <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, -MOVE_STEP)}>
+              <Text style={styles.dpadText}>◀</Text>
+            </TouchableOpacity>
+            <View style={styles.dpadCenter} />
+            <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(0, MOVE_STEP)}>
+              <Text style={styles.dpadText}>▶</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(-MOVE_STEP, 0)}>
+            <Text style={styles.dpadText}>▼</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.dpadBtn} onPress={() => moveVirtual(-MOVE_STEP, 0)}>
-          <Text style={styles.dpadText}>▼</Text>
-        </TouchableOpacity>
-      </View>
+      )}
 
       {playerStats && playerStats.hp <= 0 && (
         <View style={styles.deathOverlay}>
