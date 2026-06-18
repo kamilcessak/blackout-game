@@ -2,6 +2,7 @@ import type { Item } from '../../../types';
 import type { useAirdrops } from '../hooks/useAirdrops';
 import { AirdropForm } from './AirdropForm';
 import { AirdropMap } from './AirdropMap';
+import { AirdropsList } from './AirdropsList';
 
 interface AirdropsTabProps {
   items: Item[];
@@ -10,7 +11,19 @@ interface AirdropsTabProps {
 }
 
 export function AirdropsTab({ items, airdrop, showToast }: AirdropsTabProps) {
-  const { form, setLat, setLng, setName, addItem, removeItem, submit } = airdrop;
+  const {
+    form,
+    airdrops,
+    loading,
+    fetchAirdrops,
+    deleteAirdrop,
+    setLat,
+    setLng,
+    setName,
+    addItem,
+    removeItem,
+    submit,
+  } = airdrop;
 
   const handleLocationSelect = (lat: string, lng: string) => {
     setLat(lat);
@@ -18,26 +31,34 @@ export function AirdropsTab({ items, airdrop, showToast }: AirdropsTabProps) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
-      <AirdropForm
-        lat={form.lat}
-        lng={form.lng}
-        name={form.name}
-        items={items}
-        airdropItems={form.items}
-        saving={form.saving}
-        onLatChange={setLat}
-        onLngChange={setLng}
-        onNameChange={setName}
-        onAddItem={addItem}
-        onRemoveItem={removeItem}
-        onSubmit={submit}
-      />
-      <AirdropMap
-        lat={form.lat}
-        lng={form.lng}
-        onLocationSelect={handleLocationSelect}
-        showToast={showToast}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+        <AirdropForm
+          lat={form.lat}
+          lng={form.lng}
+          name={form.name}
+          items={items}
+          airdropItems={form.items}
+          saving={form.saving}
+          onLatChange={setLat}
+          onLngChange={setLng}
+          onNameChange={setName}
+          onAddItem={addItem}
+          onRemoveItem={removeItem}
+          onSubmit={submit}
+        />
+        <AirdropMap
+          lat={form.lat}
+          lng={form.lng}
+          onLocationSelect={handleLocationSelect}
+          showToast={showToast}
+        />
+      </div>
+      <AirdropsList
+        airdrops={airdrops}
+        loading={loading}
+        onRefresh={fetchAirdrops}
+        onDelete={deleteAirdrop}
       />
     </div>
   );

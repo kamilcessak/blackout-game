@@ -47,7 +47,9 @@ export function usePlayers(showToast: (msg: string, type: 'success' | 'error') =
   const setPlayerLevel = useCallback(
     async (id: number, level: number) => {
       try {
-        await api.patch(`/players/${id}/level`, { level, xp: 0 });
+        // Wysyłamy tylko level — backend zachowuje dotychczasowe XP. Wcześniej `xp: 0`
+        // przy każdej zmianie poziomu kasowało postęp gracza (niezamierzony efekt uboczny).
+        await api.patch(`/players/${id}/level`, { level });
         showToast(`Ustawiono poziom ${level}`, 'success');
         await fetchPlayers();
       } catch {

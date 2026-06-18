@@ -5,9 +5,22 @@ import { signToken, UserRole } from '@/middleware/jwt';
 
 const prisma = new PrismaClient();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password } = req.body ?? {};
+
+    // Walidacja wejścia — bez niej brak hasła powoduje crash bcrypt i generyczne 500.
+    if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({ error: 'Podaj poprawny adres e-mail.' });
+    }
+    if (typeof username !== 'string' || username.trim().length < 3) {
+      return res.status(400).json({ error: 'Nazwa użytkownika musi mieć min. 3 znaki.' });
+    }
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Hasło musi mieć min. 6 znaków.' });
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -36,7 +49,12 @@ export const register = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body ?? {};
+
+    // Bez walidacji brak hasła => bcrypt.compare(undefined, ...) rzuca i zwraca 500.
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+      return res.status(400).json({ error: 'Wymagane pola: email i hasło.' });
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {

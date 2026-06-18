@@ -7,10 +7,12 @@ interface ItemsTabProps {
   items: Item[];
   loading: boolean;
   onRefresh: () => void;
-  onCreate: (name: string, type: string, description: string) => Promise<void>;
+  onCreate: (name: string, type: string, description: string) => Promise<boolean>;
+  onUpdate: (id: number, name: string, type: string) => Promise<boolean>;
+  onDelete: (id: number, name: string) => Promise<boolean>;
 }
 
-export function ItemsTab({ items, loading, onRefresh, onCreate }: ItemsTabProps) {
+export function ItemsTab({ items, loading, onRefresh, onCreate, onUpdate, onDelete }: ItemsTabProps) {
   return (
     <div
       style={{
@@ -25,7 +27,13 @@ export function ItemsTab({ items, loading, onRefresh, onCreate }: ItemsTabProps)
         <ItemStats items={items} />
       </aside>
       <section>
-        <ItemsTable items={items} loading={loading} onRefresh={onRefresh} />
+        <ItemsTable
+          items={items}
+          loading={loading}
+          onRefresh={onRefresh}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+        />
       </section>
     </div>
   );

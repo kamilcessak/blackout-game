@@ -47,7 +47,14 @@ function App() {
 function AdminApp({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const { toast, showToast } = useToast();
-  const { items, loading: itemsLoading, fetchItems, createItem } = useItems(showToast);
+  const {
+    items,
+    loading: itemsLoading,
+    fetchItems,
+    createItem,
+    updateItem,
+    deleteItem,
+  } = useItems(showToast);
   const {
     players,
     loading: playersLoading,
@@ -59,10 +66,15 @@ function AdminApp({ onLogout }: { onLogout: () => void }) {
   const airdrop = useAirdrops(showToast);
   const gameConfig = useGameConfig(showToast);
 
+  const { fetchAirdrops } = airdrop;
+
   useEffect(() => {
     if (activeTab === 'PLAYERS' && players.length === 0) fetchPlayers();
-    if (activeTab === 'AIRDROPS' && items.length === 0) fetchItems();
-  }, [activeTab, players.length, items.length, fetchPlayers, fetchItems]);
+    if (activeTab === 'AIRDROPS') {
+      if (items.length === 0) fetchItems();
+      fetchAirdrops();
+    }
+  }, [activeTab, players.length, items.length, fetchPlayers, fetchItems, fetchAirdrops]);
 
   const badgeText =
     activeTab === 'ITEMS'
@@ -92,6 +104,8 @@ function AdminApp({ onLogout }: { onLogout: () => void }) {
             loading={itemsLoading}
             onRefresh={fetchItems}
             onCreate={createItem}
+            onUpdate={updateItem}
+            onDelete={deleteItem}
           />
         )}
 

@@ -11,6 +11,7 @@ import { SettingsScreen } from '@/features/player/screens/SettingsScreen';
 import { getToken } from '@/utils/storage';
 
 import { RootStackParamList } from './types';
+import { navigationRef } from './navigationRef';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -34,7 +35,7 @@ export const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{

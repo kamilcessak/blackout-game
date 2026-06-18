@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { getToken } from './storage';
+import { getToken, removeToken } from './storage';
+import { resetToLogin } from '@/navigation/navigationRef';
 
 export const api = axios.create({
   baseURL: 'http://172.20.10.2:3000/api',
@@ -15,3 +16,16 @@ api.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+// Obsługa wygaśnięcia / unieważnienia tokena: 401 z dowolnego zapytania czyści token
+// i przenosi gracza na ekran logowania (auto-logout), zamiast zostawiać go "zawieszonego".
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      await removeToken();
+      resetToLogin();
+    }
+    return Promise.reject(error);
+  },
+);

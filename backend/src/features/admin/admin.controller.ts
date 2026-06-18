@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -29,6 +29,68 @@ export const createItem = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Nie udało się utworzyć przedmiotu.' });
+  }
+};
+
+export const updateItem = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Nieprawidłowe ID przedmiotu.' });
+    }
+
+    const { name, type } = req.body as { name?: string; type?: string };
+    if (
+      (name !== undefined && typeof name !== 'string') ||
+      (type !== undefined && typeof type !== 'string')
+    ) {
+      return res.status(400).json({ error: 'Pola name i type muszą być tekstem.' });
+    }
+    if (name === undefined && type === undefined) {
+      return res.status(400).json({ error: 'Brak pól do aktualizacji.' });
+    }
+
+    const item = await prisma.item.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(type !== undefined && { type }),
+      },
+    });
+
+    return res.status(200).json(item);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'Przedmiot nie został znaleziony.' });
+    }
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się zaktualizować przedmiotu.' });
+  }
+};
+
+export const deleteItem = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Nieprawidłowe ID przedmiotu.' });
+    }
+
+    await prisma.item.delete({ where: { id } });
+    return res.status(204).send();
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'Przedmiot nie został znaleziony.' });
+      }
+      // P2003 — przedmiot jest używany w ekwipunku / airdropie (klucz obcy).
+      if (error.code === 'P2003') {
+        return res.status(409).json({
+          error: 'Nie można usunąć — przedmiot jest używany w ekwipunku lub zrzucie.',
+        });
+      }
+    }
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się usunąć przedmiotu.' });
   }
 };
 
@@ -94,11 +156,15 @@ export const setPlayerLevel = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Pole level jest wymagane i musi być liczbą >= 1.' });
     }
 
+    // XP aktualizujemy WYŁĄCZNIE gdy zostało jawnie podane i jest poprawne.
+    // Wcześniej brak xp w body kasował postęp gracza do 0 — niezamierzony efekt uboczny.
+    const shouldUpdateXp = xp != null && Number.isInteger(xp) && xp >= 0;
+
     const player = await prisma.user.update({
       where: { id },
       data: {
         level,
-        xp: xp != null && Number.isInteger(xp) && xp >= 0 ? xp : 0,
+        ...(shouldUpdateXp && { xp }),
       },
       select: { id: true, username: true, level: true, xp: true },
     });
@@ -191,5 +257,44 @@ export const spawnAirdrop = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Nie udało się utworzyć zrzutu.' });
+  }
+};
+
+export const getAirdrops = async (_req: Request, res: Response) => {
+  try {
+    const airdrops = await prisma.location.findMany({
+      where: { type: 'AIRDROP' },
+      orderBy: { createdAt: 'desc' },
+      include: { airdropItems: { include: { item: true } } },
+    });
+
+    return res.status(200).json(airdrops);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się pobrać zrzutów.' });
+  }
+};
+
+export const deleteAirdrop = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Nieprawidłowe ID zrzutu.' });
+    }
+
+    // Tylko lokacje typu AIRDROP — nie pozwalamy skasować zwykłych punktów na mapie.
+    const location = await prisma.location.findUnique({ where: { id } });
+    if (!location || location.type !== 'AIRDROP') {
+      return res.status(404).json({ error: 'Zrzut nie został znaleziony.' });
+    }
+
+    // airdropItems mają onDelete: Cascade; cooldowny czyścimy ręcznie.
+    await prisma.userLocationCooldown.deleteMany({ where: { locationId: id } });
+    await prisma.location.delete({ where: { id } });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Nie udało się usunąć zrzutu.' });
   }
 };

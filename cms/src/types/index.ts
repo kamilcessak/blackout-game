@@ -22,6 +22,23 @@ export interface AirdropItem {
   quantity: number;
 }
 
+export interface AirdropEntryItem {
+  id: number;
+  itemId: number;
+  quantity: number;
+  item: Item;
+}
+
+export interface Airdrop {
+  id: number;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+  airdropItems: AirdropEntryItem[];
+}
+
 export interface GameConfig {
   id: number;
   xpPerLoot: number;

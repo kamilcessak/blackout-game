@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from '../../../components/Card';
 import { styles } from '../../../styles/shared';
 
 interface ItemFormProps {
-  onSubmit: (name: string, type: string, description: string) => Promise<void>;
+  onSubmit: (name: string, type: string, description: string) => Promise<boolean>;
 }
 
 export function ItemForm({ onSubmit }: ItemFormProps) {
@@ -20,10 +20,13 @@ export function ItemForm({ onSubmit }: ItemFormProps) {
 
     setSaving(true);
     try {
-      await onSubmit(name.trim(), type, description.trim());
-      setName('');
-      setDescription('');
-      setType(ITEM_TYPES[0]);
+      // Czyścimy formularz tylko po realnym sukcesie — błąd zostawia dane do poprawy.
+      const ok = await onSubmit(name.trim(), type, description.trim());
+      if (ok) {
+        setName('');
+        setDescription('');
+        setType(ITEM_TYPES[0]);
+      }
     } finally {
       setSaving(false);
     }

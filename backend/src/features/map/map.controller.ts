@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { calculateDistance } from '../../utils/distance';
 
 const prisma = new PrismaClient();
@@ -12,16 +12,23 @@ const OVERPASS_ENDPOINTS = [
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Twardy timeout na pojedyncze zapytanie do Overpass — bez tego wiszący endpoint
+// blokowałby request gracza w nieskończoność (Overpass potrafi nie odpowiadać).
+const OVERPASS_TIMEOUT_MS = 15_000;
+
 async function fetchOverpass(query: string): Promise<globalThis.Response> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < OVERPASS_ENDPOINTS.length; attempt++) {
     const url = OVERPASS_ENDPOINTS[attempt]!;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
     try {
       const fetchRes = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `data=${encodeURIComponent(query)}`,
+        signal: controller.signal,
       });
 
       if (fetchRes.ok) return fetchRes;
@@ -30,6 +37,8 @@ async function fetchOverpass(query: string): Promise<globalThis.Response> {
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.warn(`Overpass endpoint ${url} failed: ${lastError.message}, trying next...`);
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (attempt < OVERPASS_ENDPOINTS.length - 1) {
@@ -248,17 +257,6 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, xp: true, level: true },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'Gracz nie został znaleziony.' });
-    }
-
-    const config = await getGameConfig();
-
     const { lat, lng } = req.body as { lat?: number; lng?: number };
 
     if (lat === undefined || lng === undefined) {
@@ -266,206 +264,225 @@ export const lootOnLocation = async (req: Request, res: Response) => {
       return;
     }
 
-    const location = await prisma.location.findUnique({ where: { id: locationId } });
-
-    if (!location) {
-      return res.status(404).json({ error: 'Lokalizacja nie znaleziona' });
-    }
-
-    const dist = calculateDistance(lat, lng, location.latitude, location.longitude);
-    if (dist > 50) {
-      return res.status(403).json({
-        error: 'Jesteś za daleko od tego punktu (Weryfikacja serwera)!',
-      });
-    }
-
-    const maxCapacity = config.baseStorage + (user.level * config.storagePerLevel);
-
-    const backpackSum = await prisma.inventoryItem.aggregate({
-      where: { userId },
-      _sum: { quantity: true },
-    });
-
-    if ((backpackSum._sum.quantity ?? 0) >= maxCapacity) {
-      return res.status(400).json({
-        error: `Twój plecak jest pełny! (Limit: ${maxCapacity})`,
-      });
-    }
-
+    const config = await getGameConfig();
     const COOLDOWN_MINUTES = 15;
-    const now = new Date();
 
-    const existingCooldown = await prisma.userLocationCooldown.findUnique({
-      where: { userId_locationId: { userId, locationId } },
-    });
-
-    if (existingCooldown) {
-      const elapsedMs = now.getTime() - existingCooldown.lootedAt.getTime();
-      const elapsedMinutes = elapsedMs / (1000 * 60);
-
-      if (elapsedMinutes < COOLDOWN_MINUTES) {
-        const minutesLeft = Math.ceil(COOLDOWN_MINUTES - elapsedMinutes);
-        return res.status(403).json({
-          error: `To miejsce jest jeszcze puste. Wróć za ${minutesLeft} ${minutesLeft === 1 ? 'minutę' : 'minut'}.`,
-          cooldownMinutesLeft: minutesLeft,
+    // Cały loot w jednej transakcji (Serializable). Pojemność plecaka, cooldown,
+    // dodanie przedmiotu, naliczenie XP i usunięcie airdropu muszą być atomowe — bez
+    // tego double-tap pozwala przekroczyć plecak, farmić XP i wywołać 500 przy
+    // podwójnym usunięciu airdropu. Serializable sprawia, że równoległy konflikt
+    // jednej z transakcji jest odrzucany (P2034 obsłużony niżej).
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { id: true, xp: true, level: true },
         });
-      }
-    }
+        if (!user) return { status: 404, body: { error: 'Gracz nie został znaleziony.' } };
 
-    const emptyLootChance = Math.random();
+        const location = await tx.location.findUnique({ where: { id: locationId } });
+        if (!location) return { status: 404, body: { error: 'Lokalizacja nie znaleziona' } };
 
-    const isAirdrop = location.type === 'AIRDROP';
-
-    if (!isAirdrop) {
-      await prisma.userLocationCooldown.upsert({
-        where: { userId_locationId: { userId, locationId } },
-        update: { lootedAt: now },
-        create: { userId, locationId, lootedAt: now },
-      });
-    }
-
-    if (isAirdrop) {
-      const airdropItems = await prisma.airdropItem.findMany({
-        where: { locationId },
-        include: { item: true },
-      });
-
-      if (airdropItems.length > 0) {
-        const lootedNames: string[] = [];
-
-        for (const ai of airdropItems) {
-          await prisma.inventoryItem.upsert({
-            where: { userId_itemId: { userId, itemId: ai.itemId } },
-            update: { quantity: { increment: ai.quantity } },
-            create: { userId, itemId: ai.itemId, quantity: ai.quantity },
-          });
-          lootedNames.push(`${ai.item.name} x${ai.quantity}`);
+        const dist = calculateDistance(lat, lng, location.latitude, location.longitude);
+        if (dist > 50) {
+          return {
+            status: 403,
+            body: { error: 'Jesteś za daleko od tego punktu (Weryfikacja serwera)!' },
+          };
         }
 
-        const airdropXp = processXpGain(user.xp, user.level, config.xpPerLoot);
-        await prisma.user.update({
+        const maxCapacity = config.baseStorage + user.level * config.storagePerLevel;
+        const backpackSum = await tx.inventoryItem.aggregate({
+          where: { userId },
+          _sum: { quantity: true },
+        });
+        if ((backpackSum._sum.quantity ?? 0) >= maxCapacity) {
+          return {
+            status: 400,
+            body: { error: `Twój plecak jest pełny! (Limit: ${maxCapacity})` },
+          };
+        }
+
+        const now = new Date();
+        const existingCooldown = await tx.userLocationCooldown.findUnique({
+          where: { userId_locationId: { userId, locationId } },
+        });
+
+        if (existingCooldown) {
+          const elapsedMinutes =
+            (now.getTime() - existingCooldown.lootedAt.getTime()) / (1000 * 60);
+          if (elapsedMinutes < COOLDOWN_MINUTES) {
+            const minutesLeft = Math.ceil(COOLDOWN_MINUTES - elapsedMinutes);
+            return {
+              status: 403,
+              body: {
+                error: `To miejsce jest jeszcze puste. Wróć za ${minutesLeft} ${minutesLeft === 1 ? 'minutę' : 'minut'}.`,
+                cooldownMinutesLeft: minutesLeft,
+              },
+            };
+          }
+        }
+
+        const isAirdrop = location.type === 'AIRDROP';
+
+        if (!isAirdrop) {
+          await tx.userLocationCooldown.upsert({
+            where: { userId_locationId: { userId, locationId } },
+            update: { lootedAt: now },
+            create: { userId, locationId, lootedAt: now },
+          });
+        }
+
+        if (isAirdrop) {
+          const airdropItems = await tx.airdropItem.findMany({
+            where: { locationId },
+            include: { item: true },
+          });
+
+          if (airdropItems.length > 0) {
+            const lootedNames: string[] = [];
+            for (const ai of airdropItems) {
+              await tx.inventoryItem.upsert({
+                where: { userId_itemId: { userId, itemId: ai.itemId } },
+                update: { quantity: { increment: ai.quantity } },
+                create: { userId, itemId: ai.itemId, quantity: ai.quantity },
+              });
+              lootedNames.push(`${ai.item.name} x${ai.quantity}`);
+            }
+
+            const airdropXp = processXpGain(user.xp, user.level, config.xpPerLoot);
+            await tx.user.update({
+              where: { id: userId },
+              data: { xp: airdropXp.xp, level: airdropXp.level },
+            });
+
+            await tx.userLocationCooldown.deleteMany({ where: { locationId } });
+            // deleteMany zamiast delete — idempotentne, nie rzuca 500 gdy airdrop już zniknął.
+            await tx.location.deleteMany({ where: { id: locationId } });
+
+            return {
+              status: 200,
+              body: {
+                success: true,
+                message: `Zrzut przeszukany! Znaleziono: ${lootedNames.join(', ')}.`,
+                xpGained: config.xpPerLoot,
+                xp: airdropXp.xp,
+                level: airdropXp.level,
+                leveledUp: airdropXp.leveledUp,
+              },
+            };
+          }
+
+          // Fallback: airdrop bez zdefiniowanych itemów — losowy przedmiot.
+          const allItems = await tx.item.findMany();
+          if (allItems.length === 0) {
+            await tx.userLocationCooldown.deleteMany({ where: { locationId } });
+            await tx.location.deleteMany({ where: { id: locationId } });
+            return {
+              status: 200,
+              body: { success: true, message: 'Zrzut przeszukany, ale był pusty.' },
+            };
+          }
+
+          const randomItem = allItems[Math.floor(Math.random() * allItems.length)]!;
+          await tx.inventoryItem.upsert({
+            where: { userId_itemId: { userId, itemId: randomItem.id } },
+            update: { quantity: { increment: 1 } },
+            create: { userId, itemId: randomItem.id, quantity: 1 },
+          });
+
+          const fallbackXp = processXpGain(user.xp, user.level, config.xpPerLoot);
+          await tx.user.update({
+            where: { id: userId },
+            data: { xp: fallbackXp.xp, level: fallbackXp.level },
+          });
+
+          await tx.userLocationCooldown.deleteMany({ where: { locationId } });
+          await tx.location.deleteMany({ where: { id: locationId } });
+
+          return {
+            status: 200,
+            body: {
+              success: true,
+              message: `Zrzut przeszukany! Znaleziono: ${randomItem.name}.`,
+              item: randomItem,
+              xpGained: config.xpPerLoot,
+              xp: fallbackXp.xp,
+              level: fallbackXp.level,
+              leveledUp: fallbackXp.leveledUp,
+            },
+          };
+        }
+
+        if (Math.random() < 0.3) {
+          return {
+            status: 200,
+            body: {
+              success: true,
+              message: 'Przeszukałeś to miejsce i nic nie znaleziono. Ktoś tu był przed tobą.',
+            },
+          };
+        }
+
+        const allItems = await tx.item.findMany();
+        if (allItems.length === 0) {
+          return { status: 500, body: { error: 'Brak przedmiotów w bazie danych.' } };
+        }
+
+        const LOCATION_LOOT_WEIGHTS: Record<string, Record<string, number>> = {
+          WATER: { WATER: 6, FOOD: 1, MEDKIT: 1, RESOURCE: 1 },
+          FOOD: { FOOD: 6, WATER: 1, MEDKIT: 1, RESOURCE: 1 },
+          MEDICAL: { MEDKIT: 6, WATER: 2, FOOD: 1, RESOURCE: 1 },
+        };
+
+        const weights = LOCATION_LOOT_WEIGHTS[location.type] ?? {};
+        const weightedPool = allItems.flatMap((item) => {
+          const w = weights[item.type] ?? 1;
+          return Array(w).fill(item);
+        });
+
+        const randomItem = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+        if (!randomItem) {
+          return { status: 500, body: { error: 'Nie udało się wybrać przedmiotu.' } };
+        }
+
+        const inventoryEntry = await tx.inventoryItem.upsert({
+          where: { userId_itemId: { userId, itemId: randomItem.id } },
+          update: { quantity: { increment: 1 } },
+          create: { userId, itemId: randomItem.id, quantity: 1 },
+        });
+
+        const xpResult = processXpGain(user.xp, user.level, config.xpPerLoot);
+        await tx.user.update({
           where: { id: userId },
-          data: { xp: airdropXp.xp, level: airdropXp.level },
+          data: { xp: xpResult.xp, level: xpResult.level },
         });
 
-        await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
-        await prisma.location.delete({ where: { id: locationId } });
-
-        return res.status(200).json({
-          success: true,
-          message: `Zrzut przeszukany! Znaleziono: ${lootedNames.join(', ')}.`,
-          xpGained: config.xpPerLoot,
-          xp: airdropXp.xp,
-          level: airdropXp.level,
-          leveledUp: airdropXp.leveledUp,
-        });
-      }
-
-      // Fallback: airdrop without predefined items — give one random item
-      const allItems = await prisma.item.findMany();
-      if (allItems.length === 0) {
-        await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
-        await prisma.location.delete({ where: { id: locationId } });
-        return res.status(200).json({
-          success: true,
-          message: 'Zrzut przeszukany, ale był pusty.',
-        });
-      }
-
-      const randomItem = allItems[Math.floor(Math.random() * allItems.length)]!;
-      await prisma.inventoryItem.upsert({
-        where: { userId_itemId: { userId, itemId: randomItem.id } },
-        update: { quantity: { increment: 1 } },
-        create: { userId, itemId: randomItem.id, quantity: 1 },
-      });
-
-      const fallbackXp = processXpGain(user.xp, user.level, config.xpPerLoot);
-      await prisma.user.update({
-        where: { id: userId },
-        data: { xp: fallbackXp.xp, level: fallbackXp.level },
-      });
-
-      await prisma.userLocationCooldown.deleteMany({ where: { locationId } });
-      await prisma.location.delete({ where: { id: locationId } });
-
-      return res.status(200).json({
-        success: true,
-        message: `Zrzut przeszukany! Znaleziono: ${randomItem.name}.`,
-        item: randomItem,
-        xpGained: config.xpPerLoot,
-        xp: fallbackXp.xp,
-        level: fallbackXp.level,
-        leveledUp: fallbackXp.leveledUp,
-      });
-    }
-
-    if (emptyLootChance < 0.3) {
-      return res.status(200).json({
-        success: true,
-        message: 'Przeszukałeś to miejsce i nic nie znaleziono. Ktoś tu był przed tobą.',
-      });
-    }
-
-    const allItems = await prisma.item.findMany();
-    if (allItems.length === 0) {
-      return res.status(500).json({
-        error: 'Brak przedmiotów w bazie danych.',
-      });
-    }
-
-    const LOCATION_LOOT_WEIGHTS: Record<string, Record<string, number>> = {
-      WATER: { WATER: 6, FOOD: 1, MEDKIT: 1, RESOURCE: 1 },
-      FOOD: { FOOD: 6, WATER: 1, MEDKIT: 1, RESOURCE: 1 },
-      MEDICAL: { MEDKIT: 6, WATER: 2, FOOD: 1, RESOURCE: 1 },
-    };
-
-    const weights = LOCATION_LOOT_WEIGHTS[location.type] ?? {};
-    const weightedPool = allItems.flatMap((item) => {
-      const w = weights[item.type] ?? 1;
-      return Array(w).fill(item);
-    });
-
-    const randomItem = weightedPool[Math.floor(Math.random() * weightedPool.length)];
-    if (!randomItem) {
-      return res.status(500).json({
-        error: 'Nie udało się wybrać przedmiotu.',
-      });
-    }
-
-    const inventoryEntry = await prisma.inventoryItem.upsert({
-      where: {
-        userId_itemId: {
-          userId: userId,
-          itemId: randomItem.id,
-        },
+        return {
+          status: 200,
+          body: {
+            success: true,
+            message: `Znaleziono ${randomItem.name} w ilości ${inventoryEntry.quantity}.`,
+            item: randomItem,
+            totalQuantity: inventoryEntry.quantity,
+            xpGained: config.xpPerLoot,
+            xp: xpResult.xp,
+            level: xpResult.level,
+            leveledUp: xpResult.leveledUp,
+          },
+        };
       },
-      update: {
-        quantity: { increment: 1 },
-      },
-      create: {
-        userId: userId,
-        itemId: randomItem.id,
-        quantity: 1,
-      },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
-    const xpResult = processXpGain(user.xp, user.level, config.xpPerLoot);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { xp: xpResult.xp, level: xpResult.level },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Znaleziono ${randomItem.name} w ilości ${inventoryEntry.quantity}.`,
-      item: randomItem,
-      totalQuantity: inventoryEntry.quantity,
-      xpGained: config.xpPerLoot,
-      xp: xpResult.xp,
-      level: xpResult.level,
-      leveledUp: xpResult.leveledUp,
-    });
+    return res.status(result.status).json(result.body);
   } catch (error) {
+    // P2034 = konflikt serializacji / zakleszczenie — typowe przy double-tap. Klient może ponowić.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return res.status(409).json({
+        error: 'Zbyt szybkie powtórne lootowanie. Spróbuj ponownie.',
+      });
+    }
     console.error(error);
     return res.status(500).json({
       error: 'Wystąpił błąd podczas próby znalezienia przedmiotu.',
