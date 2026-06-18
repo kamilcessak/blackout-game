@@ -3,7 +3,7 @@ import { getToken, removeToken } from './storage';
 import { resetToLogin } from '@/navigation/navigationRef';
 
 export const api = axios.create({
-  baseURL: 'http://172.20.10.2:3000/api',
+  baseURL: 'http://192.168.1.22:3000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -27,5 +27,5 @@ api.interceptors.response.use(
       resetToLogin();
     }
     return Promise.reject(error);
-  },
+  }
 );

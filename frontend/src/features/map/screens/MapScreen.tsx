@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Callout } from 'react-native-maps';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
@@ -26,6 +26,8 @@ import { getApiErrorMessage } from '@/utils/apiError';
 import { darkMapStyle } from '../styles/darkMapStyle';
 import { usePlayerStats } from '@/features/player/hooks/usePlayerStats';
 import { useRespawn } from '@/features/player/hooks/useRespawn';
+import { SvgMarker } from '../components/SvgMarker';
+import { MarkerVariant } from '../components/MarkerGraphic';
 
 type LocationMarkerProps = {
   loc: {
@@ -41,57 +43,35 @@ type LocationMarkerProps = {
   onLoot: (id: number, name: string, lat: number, lon: number) => void;
 };
 
+function locationVariant(type: string, isOnCooldown?: boolean): MarkerVariant {
+  if (isOnCooldown === true) return 'cooldown';
+  switch (type) {
+    case 'AIRDROP':
+      return 'airdrop';
+    case 'WATER':
+      return 'water';
+    case 'MEDICAL':
+      return 'medical';
+    case 'SHOP':
+    case 'FOOD':
+      return 'food';
+    default:
+      return 'package';
+  }
+}
+
 const LocationMarker = React.memo(function LocationMarker({
   loc,
   isPending,
   onLoot,
 }: LocationMarkerProps) {
-  const [tracksViewChanges, setTracksViewChanges] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setTracksViewChanges(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const isAirdrop = loc.type === 'AIRDROP';
-
-  const markerIconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] =
-    loc.isOnCooldown === true
-      ? 'grave-stone'
-      : isAirdrop
-        ? 'parachute'
-        : loc.type === 'WATER'
-          ? 'water'
-          : loc.type === 'MEDICAL'
-            ? 'medical-bag'
-            : loc.type === 'SHOP' || loc.type === 'FOOD'
-              ? 'food-takeout-box'
-              : 'package-variant';
-
-  const markerIconSize = isAirdrop ? 30 : 24;
-  const markerIconColor = isAirdrop ? '#fbbf24' : '#ffffff';
-
   return (
-    <Marker
+    <SvgMarker
+      variant={locationVariant(loc.type, loc.isOnCooldown)}
       coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
       title={loc.name}
       description={loc.description || loc.type}
-      anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={tracksViewChanges}
     >
-      <View
-        style={[
-          locationMarkerStyles.marker,
-          isAirdrop && locationMarkerStyles.airdrop,
-          loc.isOnCooldown === true && locationMarkerStyles.cooldown,
-        ]}
-      >
-        <MaterialCommunityIcons
-          name={markerIconName}
-          size={markerIconSize}
-          color={markerIconColor}
-        />
-      </View>
       <Callout
         onPress={
           loc.isOnCooldown === true
@@ -111,42 +91,11 @@ const LocationMarker = React.memo(function LocationMarker({
           )}
         </View>
       </Callout>
-    </Marker>
+    </SvgMarker>
   );
 });
 
 const locationMarkerStyles = StyleSheet.create({
-  marker: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(10, 10, 10, 0.85)',
-    borderWidth: 2,
-    borderColor: '#cc3300',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#cc3300',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 5,
-    elevation: 6,
-  },
-  airdrop: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-    borderColor: '#f59e0b',
-    shadowColor: '#f59e0b',
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  cooldown: {
-    borderColor: '#444',
-    shadowColor: '#444',
-    shadowOpacity: 0.3,
-  },
   callout: {
     width: 200,
     padding: 10,
@@ -376,6 +325,11 @@ export const MapScreen = () => {
         ref={mapRef}
         style={map}
         provider="google"
+        // The LATEST Google renderer clips custom markers on Android under the
+        // React Native New Architecture (Fabric), which Expo SDK 54 enables by
+        // default. The LEGACY renderer draws custom marker bitmaps correctly.
+        // See react-native-maps issues #5165 / #5728.
+        googleRenderer="LEGACY"
         customMapStyle={darkMapStyle}
         initialRegion={{
           latitude: userLocation?.coords.latitude ?? 50.885,
@@ -386,18 +340,13 @@ export const MapScreen = () => {
         showsUserLocation={false}
       >
         {markerCoords && (
-          <Marker
+          <SvgMarker
             key="player"
+            variant="player"
             coordinate={markerCoords}
             title="Twoja pozycja"
             zIndex={999}
-            tracksViewChanges={false}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.playerMarker}>
-              <MaterialCommunityIcons name="run-fast" size={28} color="#4ade80" />
-            </View>
-          </Marker>
+          />
         )}
         {locations?.map((loc) => (
           <LocationMarker
@@ -594,21 +543,6 @@ const styles = StyleSheet.create({
     color: '#00ff00',
     fontSize: 22,
     fontWeight: 'bold',
-  },
-  playerMarker: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    borderWidth: 2.5,
-    borderColor: '#00ff00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#00ff00',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    elevation: 10,
   },
   deathOverlay: {
     ...StyleSheet.absoluteFillObject,
