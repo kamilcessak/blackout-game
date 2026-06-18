@@ -4,7 +4,9 @@
   "description": "",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "nodemon --exec 'ts-node -r tsconfig-paths/register' src/index.ts"
+    "dev": "nodemon --exec 'ts-node -r tsconfig-paths/register' src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node -r ts-node/register -r tsconfig-paths/register --test 'src/**/*.test.ts'"
   },
   "keywords": [],
   "author": "",

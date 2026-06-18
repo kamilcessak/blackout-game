@@ -14,7 +14,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 
 import { removeToken, saveVirtualLocation } from '@/utils/storage';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { useUpdateUsername } from '../hooks/useUpdateUsername';
+import { usePlayerStats } from '../hooks/usePlayerStats';
 import { RootStackParamList } from '@/navigation/types';
 
 type SettingsNavProp = StackNavigationProp<RootStackParamList, 'Settings'>;
@@ -24,6 +26,7 @@ export const SettingsScreen = () => {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const { mutate: updateUsername, isPending } = useUpdateUsername();
+  const { data: stats } = usePlayerStats();
   const [isLocationSyncing, setIsLocationSyncing] = useState(false);
 
   const handleSaveUsername = () => {
@@ -37,8 +40,8 @@ export const SettingsScreen = () => {
         Alert.alert('Sukces', 'Nazwa użytkownika została zaktualizowana.');
         setUsername('');
       },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Nie udało się zaktualizować nazwy.';
+      onError: (error) => {
+        const message = getApiErrorMessage(error, 'Nie udało się zaktualizować nazwy.');
         Alert.alert('Błąd', message);
       },
     });
@@ -82,6 +85,9 @@ export const SettingsScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Zmień nazwę użytkownika</Text>
+        <Text style={styles.currentUsername}>
+          Aktualna nazwa: {stats?.username?.trim() ? stats.username : 'brak'}
+        </Text>
         <TextInput
           style={styles.input}
           placeholder="Nowa nazwa gracza"
@@ -173,6 +179,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 14,
+  },
+  currentUsername: {
+    color: '#fff',
+    fontSize: 15,
+    marginBottom: 12,
   },
   input: {
     backgroundColor: '#1a1a1a',

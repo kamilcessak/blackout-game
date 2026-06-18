@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 export const getPlayerInventory = async (req: Request, res: Response) => {
   try {
@@ -59,7 +57,9 @@ export const consumeItem = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Nie posiadasz tego przedmiotu w ekwipunku.' });
     }
 
-    const delta = 30;
+    // Wartość regeneracji pochodzi z konfiguracji gry (DB), nie z magicznej liczby w kodzie.
+    const config = await prisma.gameConfig.findFirst({ where: { id: 1 } });
+    const delta = config?.healAmount ?? 30;
 
     const updatedStats = await prisma.$transaction(async (tx) => {
       if (inventoryEntry.quantity <= 1) {
@@ -125,26 +125,18 @@ export const consumeItem = async (req: Request, res: Response) => {
   }
 };
 
-const recipes = [
-  {
-    id: 1,
-    name: 'Oczyszczona Woda',
-    type: 'WATER',
-    ingredients: [
-      { name: 'Brudna Woda', qty: 1 },
-      { name: 'Złom', qty: 1 },
-    ],
-  },
-  {
-    id: 2,
-    name: 'Apteczka',
-    type: 'MEDKIT',
-    ingredients: [
-      { name: 'Bandaż', qty: 2 },
-      { name: 'Złom', qty: 1 },
-    ],
-  },
-];
+export const getRecipes = async (_req: Request, res: Response) => {
+  try {
+    const recipes = await prisma.recipe.findMany({
+      orderBy: { id: 'asc' },
+      include: { ingredients: { orderBy: { id: 'asc' } } },
+    });
+    return res.status(200).json(recipes);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Wystąpił błąd podczas pobierania przepisów.' });
+  }
+};
 
 export const craftItem = async (req: Request, res: Response) => {
   try {
@@ -158,7 +150,11 @@ export const craftItem = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nieprawidłowe recipeId.' });
     }
 
-    const recipe = recipes.find((r) => r.id === recipeId);
+    // Przepis pobierany z bazy zamiast z zahardkodowanej tablicy.
+    const recipe = await prisma.recipe.findUnique({
+      where: { id: recipeId },
+      include: { ingredients: true },
+    });
     if (!recipe) {
       return res.status(404).json({ error: 'Nie znaleziono przepisu.' });
     }
@@ -169,16 +165,16 @@ export const craftItem = async (req: Request, res: Response) => {
     });
 
     for (const ingredient of recipe.ingredients) {
-      const entry = playerInventory.find((inv) => inv.item.name === ingredient.name);
-      if (!entry || entry.quantity < ingredient.qty) {
+      const entry = playerInventory.find((inv) => inv.item.name === ingredient.itemName);
+      if (!entry || entry.quantity < ingredient.quantity) {
         return res.status(400).json({ error: 'Brak wymaganych składników.' });
       }
     }
 
     await prisma.$transaction(async (tx) => {
       for (const ingredient of recipe.ingredients) {
-        const entry = playerInventory.find((inv) => inv.item.name === ingredient.name)!;
-        const newQty = entry.quantity - ingredient.qty;
+        const entry = playerInventory.find((inv) => inv.item.name === ingredient.itemName)!;
+        const newQty = entry.quantity - ingredient.quantity;
 
         if (newQty <= 0) {
           await tx.inventoryItem.delete({

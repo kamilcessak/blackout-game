@@ -39,4 +39,5 @@ model GameConfig {
   xpPerLoot       Int @default(10)
   baseStorage     Int @default(10)
   storagePerLevel Int @default(5)
+  healAmount      Int @default(30) // ile HP/głodu/pragnienia przywraca zużycie przedmiotu
 }

@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
+import { Item } from '@shared/types/inventory.types';
 
 export interface LootResponse {
   success: boolean;
   message: string;
-  item?: any;
+  item?: Item;
   totalQuantity?: number;
   xpGained?: number;
   xp?: number;

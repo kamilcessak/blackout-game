@@ -22,6 +22,7 @@ import { useUserLocation } from '../hooks/useUserLocation';
 import { PlayerHUD } from '../components/PlayerHUD';
 import { calculateDistance } from '@/utils/distance';
 import { api } from '@/utils/api';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { darkMapStyle } from '../styles/darkMapStyle';
 import { usePlayerStats } from '@/features/player/hooks/usePlayerStats';
 import { useRespawn } from '@/features/player/hooks/useRespawn';
@@ -40,7 +41,11 @@ type LocationMarkerProps = {
   onLoot: (id: number, name: string, lat: number, lon: number) => void;
 };
 
-const LocationMarker = React.memo(({ loc, isPending, onLoot }: LocationMarkerProps) => {
+const LocationMarker = React.memo(function LocationMarker({
+  loc,
+  isPending,
+  onLoot,
+}: LocationMarkerProps) {
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
 
   useEffect(() => {
@@ -328,10 +333,11 @@ export const MapScreen = () => {
           ]);
           refetch();
         },
-        onError: (error: any) => {
-          const msg =
-            error?.response?.data?.error ??
-            'Nie udało się przeszukać tej lokacji. Sprawdź połączenie z serwerem.';
+        onError: (error) => {
+          const msg = getApiErrorMessage(
+            error,
+            'Nie udało się przeszukać tej lokacji. Sprawdź połączenie z serwerem.',
+          );
           Alert.alert('Błąd', msg);
         },
       }

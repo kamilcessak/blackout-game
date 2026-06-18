@@ -12,3 +12,17 @@ export interface InventoryEntry {
   quantity: number;
   item: Item;
 }
+
+export interface RecipeIngredient {
+  id: number;
+  recipeId: number;
+  itemName: string;
+  quantity: number;
+}
+
+export interface Recipe {
+  id: number;
+  name: string;
+  type: string;
+  ingredients: RecipeIngredient[];
+}

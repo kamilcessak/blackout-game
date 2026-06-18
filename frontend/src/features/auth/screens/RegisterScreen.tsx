@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { api } from '@/utils/api';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { RootStackParamList } from '@/navigation/types';
 
 type RegisterNavProp = StackNavigationProp<RootStackParamList, 'Register'>;
@@ -39,8 +40,8 @@ export const RegisterScreen = () => {
       Alert.alert('Sukces', 'Konto zostało utworzone. Możesz się teraz zalogować.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
-    } catch (error: any) {
-      const message = error.response?.data?.error || 'Nie udało się zarejestrować.';
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Nie udało się zarejestrować.');
       Alert.alert('Błąd rejestracji', message);
     } finally {
       setLoading(false);

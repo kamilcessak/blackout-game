@@ -16,3 +16,21 @@ model InventoryItem {
 
   @@unique([userId, itemId])
 }
+
+// Recepty craftingu trzymane w bazie zamiast zahardkodowane w kodzie kontrolera/ekranu.
+model Recipe {
+  id          Int                @id @default(autoincrement())
+  name        String             @unique // nazwa przedmiotu wynikowego
+  type        String // typ przedmiotu wynikowego (np. WATER, MEDKIT)
+  ingredients RecipeIngredient[]
+}
+
+model RecipeIngredient {
+  id        Int    @id @default(autoincrement())
+  recipe    Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  recipeId  Int
+  itemName  String // składnik identyfikowany po nazwie (Item.name)
+  quantity  Int    @default(1)
+
+  @@unique([recipeId, itemName])
+}

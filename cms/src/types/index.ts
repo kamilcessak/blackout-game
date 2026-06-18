@@ -44,6 +44,7 @@ export interface GameConfig {
   xpPerLoot: number;
   baseStorage: number;
   storagePerLevel: number;
+  healAmount: number;
 }
 
 export interface Toast {

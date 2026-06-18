@@ -3,6 +3,7 @@ import './config/env';
 import express, { NextFunction, Request, Response } from 'express';
 import cors, { CorsOptions } from 'cors';
 
+import { requestLogger } from './middleware/requestLogger';
 import mapRoutes from './features/map/map.routes';
 import inventoryRoutes from './features/inventory/inventory.routes';
 import playerRoutes from './features/player/player.routes';
@@ -36,6 +37,7 @@ const corsOptions: CorsOptions =
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(requestLogger);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/map', mapRoutes);
@@ -54,7 +56,6 @@ app.use((req: Request, res: Response) => {
 
 // Globalny handler błędów — łapie wyjątki z handlerów i błędy z middleware (np. CORS),
 // żeby nigdy nie wyciekła surowa stack trace ani nie wisiało zapytanie.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Nieobsłużony błąd:', err);
   if (res.headersSent) return;

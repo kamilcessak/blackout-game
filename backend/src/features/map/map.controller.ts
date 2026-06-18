@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { calculateDistance } from '../../utils/distance';
-
-const prisma = new PrismaClient();
+import { processXpGain } from '../../utils/xp';
+import { prisma } from '../../lib/prisma';
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -217,22 +217,6 @@ export const spawnDevLocation = async (req: Request, res: Response) => {
 async function getGameConfig() {
   const config = await prisma.gameConfig.findFirst({ where: { id: 1 } });
   return config ?? { xpPerLoot: 10, baseStorage: 10, storagePerLevel: 5 };
-}
-
-function processXpGain(currentXp: number, currentLevel: number, xpGained: number) {
-  let xp = currentXp + xpGained;
-  let level = currentLevel;
-  let leveledUp = false;
-
-  let xpNeeded = level * 100;
-  while (xp >= xpNeeded) {
-    xp -= xpNeeded;
-    level += 1;
-    leveledUp = true;
-    xpNeeded = level * 100;
-  }
-
-  return { xp, level, leveledUp };
 }
 
 export const lootOnLocation = async (req: Request, res: Response) => {

@@ -14,36 +14,21 @@ import { useNavigation } from '@react-navigation/native';
 import { useInventory } from '../hooks/useInventory';
 import { useConsumeItem } from '../hooks/useConsumeItem';
 import { useCraftItem } from '../hooks/useCraftItem';
+import { useRecipes } from '../hooks/useRecipes';
+import { usePlayerStats } from '@/features/player/hooks/usePlayerStats';
 
 type Tab = 'BACKPACK' | 'WORKSHOP';
-
-const recipes = [
-  {
-    id: 1,
-    name: 'Oczyszczona Woda',
-    ingredients: [
-      { name: 'Brudna Woda', qty: 1 },
-      { name: 'Złom', qty: 1 },
-    ],
-  },
-  {
-    id: 2,
-    name: 'Apteczka',
-    ingredients: [
-      { name: 'Bandaż', qty: 2 },
-      { name: 'Złom', qty: 1 },
-    ],
-  },
-];
-
-const BACKPACK_LIMIT = 20;
 
 export const InventoryScreen = () => {
   const [activeTab, setActiveTab] = useState<Tab>('BACKPACK');
 
   const { data: inventory, isLoading, isError } = useInventory();
+  const { data: stats } = usePlayerStats();
+  const { data: recipes } = useRecipes();
   const totalItems = (inventory ?? []).reduce((sum, entry) => sum + entry.quantity, 0);
-  const isBackpackFull = totalItems >= BACKPACK_LIMIT;
+  // Limit plecaka liczony z konfiguracji + poziomu (z API), nie zahardkodowany na 20.
+  const backpackLimit = stats?.maxCapacity ?? 0;
+  const isBackpackFull = backpackLimit > 0 && totalItems >= backpackLimit;
   const { mutate: consumeItem, isPending: isConsuming } = useConsumeItem();
   const { mutate: craftItem, isPending: isCrafting } = useCraftItem();
   const navigation = useNavigation();
@@ -101,7 +86,7 @@ export const InventoryScreen = () => {
 
       <View style={styles.capacityBar}>
         <Text style={[styles.capacityText, isBackpackFull && styles.capacityFull]}>
-          Pojemność plecaka: {totalItems} / {BACKPACK_LIMIT}
+          Pojemność plecaka: {totalItems} / {backpackLimit || '—'}
         </Text>
       </View>
 
@@ -173,7 +158,7 @@ export const InventoryScreen = () => {
         />
       ) : (
         <FlatList
-          data={recipes}
+          data={recipes ?? []}
           keyExtractor={(recipe) => `recipe-${recipe.id}`}
           renderItem={({ item: recipe }) => (
             <View style={styles.card}>
@@ -181,8 +166,8 @@ export const InventoryScreen = () => {
               <Text style={styles.recipeIngredients}>
                 Wymaga:{' '}
                 {recipe.ingredients.map((ing, i) => (
-                  <Text key={ing.name}>
-                    {ing.qty}x {ing.name}
+                  <Text key={ing.id}>
+                    {ing.quantity}x {ing.itemName}
                     {i < recipe.ingredients.length - 1 ? ', ' : ''}
                   </Text>
                 ))}

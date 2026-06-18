@@ -126,6 +126,7 @@ function AdminApp({ onLogout }: { onLogout: () => void }) {
 
         {activeTab === 'CONFIG' && (
           <ConfigTab
+            key={gameConfig.config ? 'loaded' : 'loading'}
             config={gameConfig.config}
             loading={gameConfig.loading}
             saving={gameConfig.saving}

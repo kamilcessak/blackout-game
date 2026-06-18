@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 export const getItems = async (req: Request, res: Response) => {
   try {
@@ -193,10 +192,11 @@ export const getGameConfig = async (_req: Request, res: Response) => {
 
 export const updateGameConfig = async (req: Request, res: Response) => {
   try {
-    const { xpPerLoot, baseStorage, storagePerLevel } = req.body as {
+    const { xpPerLoot, baseStorage, storagePerLevel, healAmount } = req.body as {
       xpPerLoot?: number;
       baseStorage?: number;
       storagePerLevel?: number;
+      healAmount?: number;
     };
 
     const config = await prisma.gameConfig.upsert({
@@ -205,12 +205,14 @@ export const updateGameConfig = async (req: Request, res: Response) => {
         ...(xpPerLoot != null && { xpPerLoot }),
         ...(baseStorage != null && { baseStorage }),
         ...(storagePerLevel != null && { storagePerLevel }),
+        ...(healAmount != null && { healAmount }),
       },
       create: {
         id: 1,
         xpPerLoot: xpPerLoot ?? 10,
         baseStorage: baseStorage ?? 10,
         storagePerLevel: storagePerLevel ?? 5,
+        healAmount: healAmount ?? 30,
       },
     });
 

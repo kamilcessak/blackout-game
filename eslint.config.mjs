@@ -17,6 +17,23 @@ export default [
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // Globalnie: zmienne/argumenty z prefiksem `_` są celowo nieużywane.
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  // Pliki konfiguracyjne CommonJS (Node): babel.config.js, app.config.js itp.
+  {
+    files: ['**/*.js', '**/*.cjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'commonjs',
+    },
+  },
   // Backend + shared: Node + TypeScript
   {
     files: ['backend/**/*.ts', 'shared/**/*.ts'],

@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Settings, Save, RefreshCw, Info } from 'lucide-react';
 import type { GameConfig } from '../../../types';
 import { Card, CardHeader, CardTitle } from '../../../components/Card';
@@ -12,28 +12,25 @@ interface ConfigTabProps {
 }
 
 export function ConfigTab({ config, loading, saving, onSave }: ConfigTabProps) {
-  const [xpPerLoot, setXpPerLoot] = useState(10);
-  const [baseStorage, setBaseStorage] = useState(10);
-  const [storagePerLevel, setStoragePerLevel] = useState(5);
-
-  useEffect(() => {
-    if (config) {
-      setXpPerLoot(config.xpPerLoot);
-      setBaseStorage(config.baseStorage);
-      setStoragePerLevel(config.storagePerLevel);
-    }
-  }, [config]);
+  // Stan inicjalizowany leniwie z propsów. Komponent jest remountowany przez `key`
+  // w rodzicu, gdy konfiguracja zostanie wczytana — dzięki temu nie synchronizujemy
+  // propsów do stanu w useEffect (antywzorzec łapany przez react-hooks).
+  const [xpPerLoot, setXpPerLoot] = useState(config?.xpPerLoot ?? 10);
+  const [baseStorage, setBaseStorage] = useState(config?.baseStorage ?? 10);
+  const [storagePerLevel, setStoragePerLevel] = useState(config?.storagePerLevel ?? 5);
+  const [healAmount, setHealAmount] = useState(config?.healAmount ?? 30);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    await onSave({ xpPerLoot, baseStorage, storagePerLevel });
+    await onSave({ xpPerLoot, baseStorage, storagePerLevel, healAmount });
   };
 
   const hasChanges =
     config != null &&
     (xpPerLoot !== config.xpPerLoot ||
       baseStorage !== config.baseStorage ||
-      storagePerLevel !== config.storagePerLevel);
+      storagePerLevel !== config.storagePerLevel ||
+      healAmount !== config.healAmount);
 
   if (loading) {
     return (
@@ -101,6 +98,21 @@ export function ConfigTab({ config, loading, saving, onSave }: ConfigTabProps) {
             />
             <span style={hintStyle}>
               Liczba dodatkowych slotów przyznawanych za każdy zdobyty poziom
+            </span>
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Regeneracja z przedmiotu (HP/głód/pragnienie)</label>
+            <input
+              style={styles.input}
+              type="number"
+              min={1}
+              value={healAmount}
+              onChange={(e) => setHealAmount(Number(e.target.value))}
+              required
+            />
+            <span style={hintStyle}>
+              Ile punktów przywraca zużycie jedzenia / wody / apteczki
             </span>
           </div>
 

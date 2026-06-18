@@ -17,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 
 import { api } from '@/utils/api';
 import { saveToken } from '@/utils/storage';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { RootStackParamList } from '@/navigation/types';
 
 type LoginNavProp = StackNavigationProp<RootStackParamList, 'Login'>;
@@ -38,8 +39,8 @@ export const LoginScreen = () => {
       const { data } = await api.post('/auth/login', { email, password });
       await saveToken(data.token);
       navigation.replace('Map');
-    } catch (error: any) {
-      const message = error.response?.data?.error || 'Nie udało się zalogować.';
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Nie udało się zalogować.');
       Alert.alert('Błąd logowania', message);
     } finally {
       setLoading(false);

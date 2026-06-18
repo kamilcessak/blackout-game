@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 export const getPlayerStats = async (req: Request, res: Response) => {
   try {
@@ -12,14 +10,20 @@ export const getPlayerStats = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { hp: true, hunger: true, thirst: true, xp: true, level: true },
+      select: { username: true, hp: true, hunger: true, thirst: true, xp: true, level: true },
     });
 
     if (!user) {
       return res.status(404).json({ error: 'Gracz nie został znaleziony.' });
     }
 
-    return res.status(200).json(user);
+    // Pojemność plecaka liczona z konfiguracji + poziomu — front nie musi jej hardkodować.
+    const config = await prisma.gameConfig.findFirst({ where: { id: 1 } });
+    const baseStorage = config?.baseStorage ?? 10;
+    const storagePerLevel = config?.storagePerLevel ?? 5;
+    const maxCapacity = baseStorage + user.level * storagePerLevel;
+
+    return res.status(200).json({ ...user, maxCapacity });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Wystąpił błąd podczas pobierania statystyk gracza.' });

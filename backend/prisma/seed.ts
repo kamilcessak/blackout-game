@@ -99,9 +99,42 @@ async function main() {
       xpPerLoot: 10,
       baseStorage: 10,
       storagePerLevel: 5,
+      healAmount: 30,
     },
   });
   console.log('⚙️ Konfiguracja gry ustawiona.');
+
+  // Recepty craftingu (wcześniej zahardkodowane w kodzie)
+  await prisma.recipeIngredient.deleteMany();
+  await prisma.recipe.deleteMany();
+  const recipes = [
+    {
+      name: 'Oczyszczona Woda',
+      type: 'WATER',
+      ingredients: [
+        { itemName: 'Brudna Woda', quantity: 1 },
+        { itemName: 'Złom', quantity: 1 },
+      ],
+    },
+    {
+      name: 'Apteczka',
+      type: 'MEDKIT',
+      ingredients: [
+        { itemName: 'Bandaż', quantity: 2 },
+        { itemName: 'Złom', quantity: 1 },
+      ],
+    },
+  ];
+  for (const recipe of recipes) {
+    await prisma.recipe.create({
+      data: {
+        name: recipe.name,
+        type: recipe.type,
+        ingredients: { createMany: { data: recipe.ingredients } },
+      },
+    });
+  }
+  console.log(`🧪 Dodano ${recipes.length} receptur craftingu.`);
 }
 
 main()
