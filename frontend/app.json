@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Blackout używa Twojej lokalizacji, aby pokazać Cię na mapie i pozwolić lootować pobliskie miejsca."
+      },
+      "bundleIdentifier": "com.damnitsdestiny.blackout",
+      "appleTeamId": "P58P2BJB5Y"
     },
     "android": {
       "adaptiveIcon": {
