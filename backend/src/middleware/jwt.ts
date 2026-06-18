@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import { env } from '@/config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const JWT_SECRET = env.JWT_SECRET;
 
 export type UserRole = 'USER' | 'ADMIN';
 

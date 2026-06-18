@@ -1,6 +1,7 @@
+import './config/env';
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 
 import mapRoutes from './features/map/map.routes';
 import inventoryRoutes from './features/inventory/inventory.routes';
@@ -8,8 +9,6 @@ import playerRoutes from './features/player/player.routes';
 import authRoutes from './features/auth/auth.routes';
 import adminRoutes from './features/admin/admin.routes';
 import { startSurvivalTick } from './features/player/player.cron';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
