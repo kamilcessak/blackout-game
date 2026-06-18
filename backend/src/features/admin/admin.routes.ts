@@ -10,8 +10,12 @@ import {
   getGameConfig,
   updateGameConfig,
 } from './admin.controller';
+import { requireAuth } from '@/middleware/requireAuth';
+import { requireAdmin } from '@/middleware/requireAdmin';
 
 const router = Router();
+
+router.use(requireAuth, requireAdmin);
 
 router.get('/items', getItems);
 router.post('/items', createItem);

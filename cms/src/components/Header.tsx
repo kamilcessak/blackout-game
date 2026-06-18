@@ -1,4 +1,4 @@
-import { Zap, Package, Users, MapPin, Settings } from 'lucide-react';
+import { Zap, Package, Users, MapPin, Settings, LogOut } from 'lucide-react';
 import type { Tab } from '../types';
 import { styles } from '../styles/shared';
 
@@ -6,6 +6,7 @@ interface HeaderProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   badgeText: string;
+  onLogout: () => void;
 }
 
 const TABS: { key: Tab; icon: typeof Package; label: string }[] = [
@@ -15,7 +16,7 @@ const TABS: { key: Tab; icon: typeof Package; label: string }[] = [
   { key: 'CONFIG', icon: Settings, label: 'Ustawienia gry' },
 ];
 
-export function Header({ activeTab, onTabChange, badgeText }: HeaderProps) {
+export function Header({ activeTab, onTabChange, badgeText, onLogout }: HeaderProps) {
   return (
     <header style={styles.header}>
       <div style={styles.headerInner}>
@@ -47,6 +48,15 @@ export function Header({ activeTab, onTabChange, badgeText }: HeaderProps) {
 
         <div style={styles.headerRight}>
           <span style={styles.badge}>{badgeText}</span>
+          <button
+            type="button"
+            onClick={onLogout}
+            style={{ ...styles.refreshBtn, gap: 6 }}
+            title="Wyloguj się"
+          >
+            <LogOut size={14} />
+            Wyloguj
+          </button>
         </div>
       </div>
     </header>

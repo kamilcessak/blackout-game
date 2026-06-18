@@ -5,6 +5,8 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 import type { Tab } from './types';
+import { getToken, clearToken } from './api/client';
+import { LoginScreen } from './features/auth/components/LoginScreen';
 import { useToast } from './hooks/useToast';
 import { useItems } from './features/items/hooks/useItems';
 import { usePlayers } from './features/players/hooks/usePlayers';
@@ -27,6 +29,22 @@ L.Icon.Default.mergeOptions({
 });
 
 function App() {
+  const [authed, setAuthed] = useState(() => !!getToken());
+
+  useEffect(() => {
+    const handleLogout = () => setAuthed(false);
+    window.addEventListener('auth-logout', handleLogout);
+    return () => window.removeEventListener('auth-logout', handleLogout);
+  }, []);
+
+  if (!authed) {
+    return <LoginScreen onSuccess={() => setAuthed(true)} />;
+  }
+
+  return <AdminApp onLogout={() => setAuthed(false)} />;
+}
+
+function AdminApp({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const { toast, showToast } = useToast();
   const { items, loading: itemsLoading, fetchItems, createItem } = useItems(showToast);
@@ -57,7 +75,15 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header activeTab={activeTab} onTabChange={setActiveTab} badgeText={badgeText} />
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        badgeText={badgeText}
+        onLogout={() => {
+          clearToken();
+          onLogout();
+        }}
+      />
 
       <main style={styles.main}>
         {activeTab === 'ITEMS' && (

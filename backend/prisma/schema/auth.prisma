@@ -3,6 +3,7 @@ model User {
   email     String   @unique
   username  String?
   password  String
+  role      String   @default("USER")
   hp        Int      @default(100)
   hunger    Int      @default(100)
   thirst    Int      @default(100)

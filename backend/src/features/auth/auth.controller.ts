@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { signToken, UserRole } from '@/middleware/jwt';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -49,7 +48,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Nieprawidłowy email lub hasło.' });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = signToken({ userId: user.id, role: user.role as UserRole });
 
     const { password: _password, ...userWithoutPassword } = user;
 

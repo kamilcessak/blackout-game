@@ -28,6 +28,18 @@ async function main() {
   });
   console.log(`👤 Utworzono gracza ID: ${player.id}`);
 
+  // Tworzenie konta administratora CMS
+  const adminPassword = await bcrypt.hash('admin1234', 10);
+  const admin = await prisma.user.create({
+    data: {
+      email: 'admin@blackout.pl',
+      username: 'Admin',
+      password: adminPassword,
+      role: 'ADMIN',
+    },
+  });
+  console.log(`🛡️ Utworzono administratora ID: ${admin.id} (admin@blackout.pl / admin1234)`);
+
   // Dodawanie puli przedmiotów do znalezienia
   const items = [
     { name: 'Brudna Woda', type: 'WATER' },

@@ -1,5 +1,5 @@
 declare namespace Express {
   interface Request {
-    user?: { id: number };
+    user?: { id: number; role: 'USER' | 'ADMIN' };
   }
 }
